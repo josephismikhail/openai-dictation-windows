@@ -89,8 +89,7 @@ internal sealed class PcmRecorder : IDisposable
             if(header.Recorded>0)
             {
                 byte[] data=new byte[header.Recorded];Marshal.Copy(header.Data,data,0,data.Length);
-                double squares=0;for(int i=0;i+1<data.Length;i+=2){double sample=(short)(data[i]|data[i+1]<<8)/32768.0;squares+=sample*sample;}
-                Level?.Invoke((float)Math.Min(1,Math.Sqrt(squares/Math.Max(1,data.Length/2))*6));Data?.Invoke(data);
+                Level?.Invoke(PixelAudioLevel.Measure(data));Data?.Invoke(data);
             }
             if(requeue && !stopping)Check(waveInAddBuffer(handle,pointer,(uint)Marshal.SizeOf<WaveHeader>()));
         }

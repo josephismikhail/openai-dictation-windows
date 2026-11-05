@@ -5,7 +5,7 @@
 - `src/OpenAIDictation.Core`: API transport, transcription session protocol, cleanup and pure helpers.
 - `src/OpenAIDictation.Windows`: WPF indicator/settings, global hotkey, microphone capture, credential storage and insertion.
 - `tests/OpenAIDictation.Tests`: synthetic protocol and behavior tests.
-- `tests/OpenAIDictation.Windows.Tests`: Windows clipboard snapshot, audio-boundary and start-cue lifecycle tests; these do not access the real clipboard, microphone or speakers.
+- `tests/OpenAIDictation.Windows.Tests`: Windows clipboard snapshot, audio-boundary, animation, overlay lifecycle, and retained start-cue lifecycle tests. The overlay test briefly opens its own non-activating window. Tests do not access the real clipboard, microphone, speakers, or API.
 - `scripts`: build/install and local lifecycle helpers.
 
 The application uses the Windows SDK interfaces exposed by .NET and direct OpenAI HTTPS/WebSocket APIs. It does not depend on a browser runtime or a local model server.
@@ -22,17 +22,17 @@ Tests must cover failure and race cases: stop before connection readiness, order
 
 Before shipping, check Win+H start/stop in Notepad, silence, Escape cancellation, settings persistence, microphone release, foreground-window changes, multiple monitors, DPI scaling, and ordinary typing while idle. Do not send any test messages. Test API calls only with an authorized local credential and synthetic speech/text.
 
-## Recording start sound
+## Pixel-style full-screen interface
 
-`RecordingStartCue.Prepare` opens and silently starts its renderer after the output mute is acquired, overlapping microphone setup. `SignalMicrophoneReady` permits playback only after `PcmRecorder.Start()` succeeds. `PresentationReady` completes after the prepared renderer queues the first sound buffer; the dispatcher then shows the recording indicator. Unavailable audio completes the same signal, so muted or failed sound cannot hide the indicator. The dispatcher rechecks session identity, cancellation, and processing state to prevent a late recording overlay after stop or cancel. It never blocks waiting for the audio worker. The cue is Handy's bundled default marimba start sound (about 580 ms), with its original gain and an MIT attribution/license in `Assets`. The 44.1 kHz PCM asset is decoded and resampled to 48 kHz locally. Nothing is downloaded. Preparation runs on an MTA worker so Core Audio can deliver new-session notifications, without blocking the shortcut dispatcher.
+`OverlayWindow` is a non-activating, topmost transparent monitor overlay. Its bounds cover the whole selected monitor, including the taskbar, using physical monitor coordinates; WPF renders in device-independent units. The original editor stays the insertion target. Tests should cover negative monitor coordinates, mixed DPI, centering, processing continuity, and Escape/stop cancellation.
 
-The normal recording lease still mutes every active render endpoint. During the chime only, `CoreAudioCuePlatform` uses the explicitly selected default output in WASAPI shared mode, mutes other processes' sessions on that endpoint, and subscribes before enumerating sessions. Only after preparation and microphone readiness may `SystemAudioMute` temporarily release its own mute on that one endpoint. Outputs that were already muted are never released. A device change cannot reroute the sound because the renderer retains the selected endpoint. The complete short asset is queued at once: some drivers block inside `IAudioClient.Start`, making small-buffer refilling unsuitable for this sound.
+`PixelAudioLevel` ports the Android PCM16 RMS-to-decibel mapping without changing captured audio. The animation ports the Pixel's 49-bar history, attack/release, 450 ms contraction, and rounded breathing processing shape, enlarged for desktop screens. It uses an 80% black scrim and white foreground. No start-sound object is created; existing cue code and tests are retained as dormant functionality.
 
-Cleanup re-mutes the endpoint before restoring session mute states. Stop/cancel drains the recorder, cancels and joins the cue, then restores endpoint states. If a driver refuses the re-mute, session protection stays held until capture is closed and the recording is failed safely. Ordinary cue setup/playback failures skip feedback without disabling dictation. Neither session nor endpoint volume levels are changed.
+On opening, the window stays transparent through its initial placement and layout. A dispatcher callback reveals it only if the presentation is still current and visible; hiding invalidates that callback. Native compositor transitions are disabled. Recording-to-processing updates reuse the same monitor and visible surface. Before insertion the overlay hides and yields, then the existing focus guards run without forcing activation. `NoSpeechDetectedException` represents a silent completed recording and dismisses without an error view; other failures retain their normal handling.
 
-Device discovery still polls every 250 ms, and Windows delivers session-created notifications asynchronously. Existing playback is protected before the cue opens, but these APIs cannot promise zero transient sound from a newly appearing device/session during discovery.
+The normal audio-mute lease remains: playback mutes while the microphone captures and restores when capture stops. Credentials, transcription, cleanup, and safe clipboard restoration are unchanged. The synthetic preview uses no microphone or API and can be canceled with Escape without reappearing later.
 
-Synthetic tests cover the microphone-ready gate, cancellation during preparation/playback, initially muted outputs, protection/playback failure, notification failure, remute failure, restoration ordering, and the asset's hash, level, and duration. Actual speaker checks are separate, explicit manual probes; the default test suite never changes system audio. The interfaces follow Microsoft's [session-notification contract](https://learn.microsoft.com/en-us/windows/win32/api/audiopolicy/nf-audiopolicy-iaudiosessionmanager2-registersessionnotification) and [WASAPI stream model](https://learn.microsoft.com/en-us/windows/win32/coreaudio/stream-management).
+To restore an earlier interface, check out a reviewed earlier revision, republish, and run the installer. Configuration and credentials remain in their usual local storage.
 
 ## Workflow
 

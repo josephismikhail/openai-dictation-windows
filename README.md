@@ -1,17 +1,17 @@
 # Windows OpenAI Dictation
 
-A small native Windows app for **Win+H dictation with OpenAI transcription and cleanup**. It shows a compact indicator near the bottom of the active monitor while you speak, then pastes the cleaned text into the app you started from.
+A small native Windows app for **Win+H dictation with OpenAI transcription and cleanup**. It dims the active monitor with the Pixel-style voice animation while you speak, then pastes the cleaned text into the app you started from.
 
 This is an independent project, inspired by Handy's minimal recording interface. It is not affiliated with Handy, Microsoft, or OpenAI.
 
 ## What it does
 
 1. Place the cursor in a text field and press **Win+H**.
-2. A short chime confirms that the microphone is listening. Speak naturally; pauses do not stop recording.
-3. Press **Win+H** again to finish. The indicator changes to processing.
-4. The app cleans up the transcript and pastes the result. The indicator disappears.
+2. Once the microphone is listening, that monitor dims behind a centered white waveform. Speak naturally; pauses do not stop recording. There is no start sound.
+3. Press **Win+H** again to finish. The waveform contracts into the same breathing rounded shape used on the Pixel.
+4. The app cleans up the transcript and pastes the result. The full-screen view disappears.
 
-Use the indicator's cancel control or **Escape** during a recording to cancel. The tray menu opens settings or exits the app. The microphone opens only during a recording; there is no always-listening mode.
+Click anywhere on the recording view to finish, or press **Escape** to cancel recording or processing. There is no visible cancel button. The tray menu opens settings or exits the app. The microphone opens only during a recording; there is no always-listening mode.
 
 Recordings stop automatically at ten minutes. If cleanup or insertion fails after a transcript is available, choose **Recover last text** in the tray menu to copy it. Recovery is held only in memory and disappears when the app exits or a later dictation succeeds.
 
@@ -44,19 +44,19 @@ Open **Settings** from the tray menu, enter your own API key, and save it. Keys 
 
 ## Interface
 
-The recording indicator is a black rounded pill with a white voice-driven waveform, status light, and cancel button. The slim 300 × 50 DIP surface gives quiet speech a pronounced response, with peaks up to 40 DIP; silence settles to a flat line. Processing uses a white spinner. Click the recording surface to finish, or its right-hand × to cancel. The pill is centered horizontally on the active monitor and sits just above its taskbar, with DPI-aware positioning. It does not take keyboard focus from your editor. The app is native WPF; it does not embed a browser or download a local language model.
+The active monitor is covered by an 80% black translucent layer, leaving its contents visible without blur. Other monitors are unchanged. The overlay finishes its initial layout before appearing to avoid a partial-screen flash. The centered white waveform uses the Pixel's 49 bars, microphone-level mapping, history, and smoothing, enlarged for a desktop display. When recording stops, it contracts over 450 ms into a large, gently breathing rounded processing shape. The view dismisses immediately before the app checks the destination and inserts the text.
 
-Errors expand into a readable card with the complete safe explanation and next step. The card remains available for 20 seconds unless dismissed or replaced by another recording. The same message is available to screen readers and in the card's tooltip.
+The overlay does not activate or take keyboard focus from the original editor. The existing insertion-target checks still apply. Escape cancels; the same Win+H shortcut starts and stops recording. Reduced system animations use a static processing shape. There are no routine status labels, start sounds, or visible cancel controls.
 
-![Recording indicator](docs/images/recording.png)
+Errors show a complete safe explanation. Escape or a click dismisses the error view; it also closes automatically after 20 seconds unless replaced by a new recording.
 
-![Processing indicator](docs/images/processing.png)
+Stopping a recording with no recognized speech dismisses silently, without inserting text or showing a notification.
 
 ## Audio while recording
 
 Starting dictation temporarily mutes every active Windows audio output, including playback from browsers, Spotify, and other apps. It preserves devices that were already muted and does not change volume levels. Audio returns after microphone capture stops, before transcription and cleanup finish. Canceling or normally exiting also restores the previous state. Newly active outputs are checked while recording.
 
-Handy's default marimba start sound plays once the microphone is ready. The output is prepared silently in advance to reduce startup delay; no sound plays if microphone startup fails. The recording indicator appears at the start of the cue instead of appearing early. Perceived loudness still depends on your output volume. Existing playback stays silenced during the chime; new audio sessions are silenced as Windows reports them. It respects an already-muted output and is skipped if Windows cannot safely play it. The visual recording indicator still works when the chime is unavailable; there is no stop or processing sound.
+There is no recording cue sound; the full-screen view indicates that the microphone is listening.
 
 This changes Windows' output mute state. If the process is forcibly terminated or crashes while recording, Windows may remain muted; unmute it using the system volume control.
 
