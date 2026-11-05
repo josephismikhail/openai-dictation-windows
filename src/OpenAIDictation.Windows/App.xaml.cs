@@ -18,6 +18,7 @@ public partial class App:System.Windows.Application
     private Session? current;
     private string recoveryText="";
     private int errorGeneration;
+    private int previewGeneration;
     private string PipeName=>"OpenAIDictation."+Environment.UserName;
     private sealed class Session
     {
@@ -31,7 +32,6 @@ public partial class App:System.Windows.Application
         internal readonly MemoryStream Recorded=new();
         internal PcmRecorder? Recorder;
         internal SystemAudioMute? AudioMute;
-        internal RecordingStartCue? StartCue;
         internal readonly object CaptureGate=new();
         internal Task Connection=Task.CompletedTask,Sender=Task.CompletedTask;
         internal bool Processing;
@@ -55,7 +55,7 @@ public partial class App:System.Windows.Application
         overlay=new OverlayWindow();overlay.StopRequested+=()=>_ = StopAsync();overlay.CancelRequested+=Cancel;
         tray=new System.Windows.Forms.NotifyIcon{Icon=System.Drawing.SystemIcons.Application,Text="OpenAI Dictation — Win+H",Visible=true};
         var menu=new System.Windows.Forms.ContextMenuStrip();menu.Items.Add("Settings",null,(_,_)=>Dispatcher.Invoke(ShowSettings));menu.Items.Add("Start / stop  Win+H",null,(_,_)=>Dispatcher.Invoke(Toggle));menu.Items.Add("Recover last text",null,(_,_)=>Dispatcher.Invoke(RecoverText));menu.Items.Add("Quit",null,(_,_)=>Dispatcher.Invoke(()=>Shutdown()));tray.ContextMenuStrip=menu;tray.DoubleClick+=(_,_)=>Dispatcher.Invoke(ShowSettings);
-        try{shortcut=new GlobalShortcut{Active=()=>current!=null};shortcut.Toggle+=()=>Dispatcher.BeginInvoke(Toggle);shortcut.Cancel+=()=>Dispatcher.BeginInvoke(Cancel);}catch{ShowError("Win+H could not be registered. Restart the app and try again.");}
+        try{shortcut=new GlobalShortcut{Active=()=>current!=null || overlay?.IsVisible==true};shortcut.Toggle+=()=>Dispatcher.BeginInvoke(Toggle);shortcut.Cancel+=()=>Dispatcher.BeginInvoke(Cancel);}catch{ShowError("Win+H could not be registered. Restart the app and try again.");}
         _=ListenAsync(lifetime.Token);
         if(e.Args.Contains("--preview"))Preview();else if(e.Args.Contains("--toggle"))Toggle();else if(e.Args.Contains("--settings") || !LocalStore.HasKey)ShowSettings();
     }
@@ -86,6 +86,7 @@ public partial class App:System.Windows.Application
     }
     private void Begin()
     {
+        previewGeneration++;
         Session? started=null;
         try
         {
@@ -99,7 +100,6 @@ public partial class App:System.Windows.Application
             {
                 if(current==session && !session.Processing)Fail(session,"Windows could not keep playback muted. Please try again.");
             });
-            session.StartCue=RecordingStartCue.Prepare(session.AudioMute,session.Cancel.Token);
             session.Connection=session.Live.StartAsync(session.Cancel.Token);
             session.Sender=Task.Run(async()=>
             {
@@ -125,19 +125,11 @@ public partial class App:System.Windows.Application
                     Dispatcher.BeginInvoke(()=>{if(current==session && !session.Processing)_=StopAsync();});
             };
             session.Recorder.Level+=level=>Dispatcher.BeginInvoke(()=>{if(current==session)overlay?.SetLevel(level);});
-            session.Recorder.Start();session.StartCue.SignalMicrophoneReady();
-            session.Stage=DictationStage.Recording;_=ShowRecordingWhenReady(session,session.StartCue);
+            session.Recorder.Start();session.Stage=DictationStage.Recording;
+            overlay!.Present(OverlayState.Recording,session.Target);
             _=ObserveConnection(session);_=LimitRecording(session);
         }
         catch(Exception ex){if(started!=null)Fail(started,DictationFailure.Describe(ex,started.Stage),ex);else{var message=DictationFailure.Describe(ex,DictationStage.Initialization);DictationFailure.Save(DictationStage.Initialization,message,ex);ShowError(message);ShowSettings();}}
-    }
-    private async Task ShowRecordingWhenReady(Session session,RecordingStartCue cue)
-    {
-        await cue.PresentationReady;
-        if(current!=session || session.Processing || session.Cancel.IsCancellationRequested
-            || lifetime.IsCancellationRequested || Dispatcher.HasShutdownStarted)return;
-        try{overlay!.Present(OverlayState.Recording,session.Target);}
-        catch(Exception error){Fail(session,DictationFailure.Describe(error,session.Stage),error);}
     }
     private async Task ObserveConnection(Session session)
     {
@@ -177,6 +169,7 @@ public partial class App:System.Windows.Application
     }
     private void Cancel()
     {
+        previewGeneration++;
         var session=current;current=null;
         try{overlay?.Hide();}catch{ /* Display errors must never prevent audio restoration. */ }
         finally
@@ -200,12 +193,7 @@ public partial class App:System.Windows.Application
             finally
             {
                 session.Recorder=null;
-                try{session.StartCue?.Dispose();}
-                finally
-                {
-                    session.StartCue=null;
-                    session.AudioMute?.Dispose();session.AudioMute=null;
-                }
+                session.AudioMute?.Dispose();session.AudioMute=null;
             }
         }
     }
@@ -219,15 +207,18 @@ public partial class App:System.Windows.Application
     {
         if(lifetime.IsCancellationRequested || Dispatcher.HasShutdownStarted)return;
         try{overlay?.Present(OverlayState.Error,NativeMethods.GetForegroundWindow(),message);}catch{ /* A removed monitor must not interfere with cleanup. */ }
-        try{if(tray!=null){tray.BalloonTipTitle="OpenAI Dictation";tray.BalloonTipText=message;tray.ShowBalloonTip(5000);}}catch(ObjectDisposedException){}_=HideErrorLater(++errorGeneration);
+        _=HideErrorLater(++errorGeneration);
     }
     private async Task HideErrorLater(int generation){try{await Task.Delay(20000,lifetime.Token);if(current==null && generation==errorGeneration)overlay?.Hide();}catch(OperationCanceledException){}catch(InvalidOperationException){}}
     private async void Preview()
     {
         try{
-            if(current!=null)return;nint target=NativeMethods.GetForegroundWindow();overlay!.Present(OverlayState.Recording,target);
-            for(int i=0;i<450 && current==null;i++){overlay.SetLevel((float)(.2+.75*Math.Abs(Math.Sin(i*.2))));await Task.Delay(33);}
-            if(current!=null)return;overlay.Present(OverlayState.Processing,target);await Task.Delay(5000);if(current==null)overlay.Hide();
+            if(current!=null)return;int generation=++previewGeneration;errorGeneration++;
+            nint target=NativeMethods.GetForegroundWindow();overlay!.Present(OverlayState.Recording,target);
+            for(int i=0;i<450 && current==null && generation==previewGeneration;i++){overlay.SetLevel((float)(.2+.75*Math.Abs(Math.Sin(i*.2))));await Task.Delay(33);}
+            if(current!=null || generation!=previewGeneration)return;
+            overlay.Present(OverlayState.Processing,target);await Task.Delay(5000);
+            if(current==null && generation==previewGeneration)overlay.Hide();
         }catch{ShowError("The preview display became unavailable.");}
     }
     protected override void OnExit(ExitEventArgs e){lifetime.Cancel();Cancel();shortcut?.Dispose();tray?.Dispose();client.Dispose();singleInstance?.Dispose();base.OnExit(e);}
