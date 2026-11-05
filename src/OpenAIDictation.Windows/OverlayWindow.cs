@@ -22,8 +22,9 @@ internal sealed class OverlayWindow:Window
         SourceInitialized+=(_,_)=>{nint handle=new WindowInteropHelper(this).Handle;NativeMethods.SetWindowLongPtr(handle,-20,NativeMethods.GetWindowLongPtr(handle,-20)|0x08000000|0x80);};
         MouseLeftButtonUp+=(_,e)=>
         {
-            double width=indicator.State==OverlayState.Recording?172:216;
-            if(e.GetPosition(this).X>(ActualWidth-width)/2+width-35 || indicator.State!=OverlayState.Recording)CancelRequested?.Invoke();else StopRequested?.Invoke();
+            var point=e.GetPosition(this);
+            var action=IndicatorLayout.HitTest(point.X,point.Y,ActualWidth,indicator.State);
+            if(action==IndicatorAction.Cancel)CancelRequested?.Invoke();else if(action==IndicatorAction.Stop)StopRequested?.Invoke();
         };
         timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(16)};
         timer.Tick+=(_,_)=>
@@ -50,36 +51,36 @@ internal sealed class OverlayWindow:Window
     {
         internal OverlayState State;internal double Time;internal string Message="";
         internal readonly VoiceSignal Signal=new();
-        private static readonly Brush Pink=Solid(Color.FromRgb(242,140,187));
-        private static readonly Brush Surface=Solid(Color.FromArgb(250,35,35,38));
-        private static readonly Brush CancelSurface=Solid(Color.FromRgb(56,56,60));
-        private static readonly Pen Border=Line(Solid(Color.FromRgb(73,73,78)),1);
-        private static readonly Pen CancelLine=Line(Brushes.LightGray,1.2);
-        private static readonly Pen SpinnerLine=Line(Pink,1.6);
+        private static readonly Brush Surface=Solid(Color.FromArgb(252,12,12,12));
+        private static readonly Brush CancelSurface=Solid(Color.FromRgb(42,42,42));
+        private static readonly Pen Border=Line(Solid(Color.FromRgb(72,72,72)),1);
+        private static readonly Pen CancelLine=Line(Brushes.White,1.6);
+        private static readonly Pen SpinnerLine=Line(Brushes.White,2);
         private static Brush Solid(Color color){var value=new SolidColorBrush(color);value.Freeze();return value;}
         private static Pen Line(Brush brush,double thickness){var value=new Pen(brush,thickness);value.Freeze();return value;}
         protected override void OnRender(DrawingContext dc)
         {
-            double width=State==OverlayState.Recording?172:216,left=(ActualWidth-width)/2;
-            dc.DrawRoundedRectangle(Surface,Border,new Rect(left,5,width,40),24,24);
-            dc.DrawEllipse(State==OverlayState.Error?Brushes.IndianRed:Pink,null,new Point(left+17,25),3.5,3.5);
+            double width=IndicatorLayout.PillWidth,left=(ActualWidth-width)/2;
+            double centerY=IndicatorLayout.PillTop+IndicatorLayout.PillHeight/2;
+            dc.DrawRoundedRectangle(Surface,Border,new Rect(left,IndicatorLayout.PillTop,width,IndicatorLayout.PillHeight),34,34);
+            dc.DrawEllipse(Brushes.White,null,new Point(left+27,centerY),4,4);
             if(State==OverlayState.Recording)
             {
-                double first=left+(width-(VoiceSignal.BarCount*4+(VoiceSignal.BarCount-1)*3))/2;
-                for(int i=0;i<VoiceSignal.BarCount;i++){double height=Signal.Height(i);dc.DrawRoundedRectangle(Pink,null,new Rect(first+i*7,25-height/2,4,height),2,2);}
+                double first=left+(width-(VoiceSignal.BarCount*6+(VoiceSignal.BarCount-1)*5))/2;
+                for(int i=0;i<VoiceSignal.BarCount;i++){double height=Signal.Height(i);dc.DrawRoundedRectangle(Brushes.White,null,new Rect(first+i*11,centerY-height/2,6,height),3,3);}
             }
             else
             {
                 if(State==OverlayState.Processing)
                 {
-                    dc.PushTransform(new RotateTransform(Time*260,left+37,25));
-                    var geometry=new StreamGeometry();using(var path=geometry.Open()){path.BeginFigure(new Point(left+37,18.5),false,false);path.ArcTo(new Point(left+30.5,25),new Size(6.5,6.5),0,true,SweepDirection.Clockwise,true,false);}
+                    dc.PushTransform(new RotateTransform(Time*260,left+82,centerY));
+                    var geometry=new StreamGeometry();using(var path=geometry.Open()){path.BeginFigure(new Point(left+82,centerY-10),false,false);path.ArcTo(new Point(left+72,centerY),new Size(10,10),0,true,SweepDirection.Clockwise,true,false);}
                     dc.DrawGeometry(null,SpinnerLine,geometry);dc.Pop();
                 }
-                var text=new FormattedText(State==OverlayState.Error?"Dictation error":"Processing",System.Globalization.CultureInfo.CurrentUICulture,FlowDirection.LeftToRight,new Typeface("Segoe UI"),12,Brushes.Gainsboro,VisualTreeHelper.GetDpi(this).PixelsPerDip);dc.DrawText(text,new Point(left+51,17));
+                var text=new FormattedText(State==OverlayState.Error?"Dictation error":"Processing",System.Globalization.CultureInfo.CurrentUICulture,FlowDirection.LeftToRight,new Typeface("Segoe UI"),15,Brushes.White,VisualTreeHelper.GetDpi(this).PixelsPerDip);dc.DrawText(text,new Point(left+(State==OverlayState.Error?87:102),centerY-text.Height/2));
             }
-            double cx=left+width-19;dc.DrawEllipse(CancelSurface,null,new Point(cx,25),11,11);
-            dc.DrawLine(CancelLine,new Point(cx-3,22),new Point(cx+3,28));dc.DrawLine(CancelLine,new Point(cx+3,22),new Point(cx-3,28));
+            double cx=left+width-27;dc.DrawEllipse(CancelSurface,null,new Point(cx,centerY),16,16);
+            dc.DrawLine(CancelLine,new Point(cx-4,centerY-4),new Point(cx+4,centerY+4));dc.DrawLine(CancelLine,new Point(cx+4,centerY-4),new Point(cx-4,centerY+4));
         }
     }
 }

@@ -4,21 +4,21 @@ namespace OpenAIDictation.Windows;
 internal sealed class VoiceSignal
 {
     internal const int BarCount=9;
-    internal const double QuietHeight=2.5,PeakHeight=32;
+    internal const double QuietHeight=2.5,PeakHeight=56;
     private static readonly double[] Shape=[.38,.58,.78,.94,1,.94,.78,.58,.38];
     private readonly double[] history=new double[BarCount];
     private double target,envelope,historyTime;
 
     internal void Observe(float level)
     {
-        if(!float.IsFinite(level) || level<=.018f){target=0;return;}
-        target=Math.Sqrt(1-Math.Exp(-22*Math.Min(1,level-.018)));
+        if(!float.IsFinite(level) || level<=.012f){target=0;return;}
+        target=Math.Sqrt(1-Math.Exp(-70*Math.Min(1,level-.012)));
     }
     internal void Advance(double seconds)
     {
         if(!double.IsFinite(seconds) || seconds<=0)return;
         seconds=Math.Min(seconds,.1);
-        double tau=target>envelope?.028:.12;
+        double tau=target>envelope?.022:.12;
         envelope+=(target-envelope)*(1-Math.Exp(-seconds/tau));
         historyTime+=seconds;
         while(historyTime>=.035)
