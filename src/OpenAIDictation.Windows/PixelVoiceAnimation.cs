@@ -29,7 +29,7 @@ internal sealed class PixelVoiceAnimation
     }
     internal PixelVoiceFrame Frame(double milliseconds,double viewWidth,double viewHeight,bool animate)
     {
-        double width=Math.Max(1,Math.Min(346,viewWidth-40));
+        double width=Math.Max(1,Math.Min(900,viewWidth-80));
         if(processing)
         {
             double transition=animate?Math.Clamp((milliseconds-processingStarted)/450,0,1):1;
@@ -60,7 +60,7 @@ internal sealed class PixelVoiceAnimation
             // Java Math.round uses floor(x+.5), rather than .NET's midpoint-to-even.
             int age=(int)Math.Floor(Math.Abs(2*position-1)*(BarCount/2)+.5);
             double history=levels[BarCount-1-age],energy=displayed*(.55+.45*history);
-            double height=1+Math.Min(300,viewHeight*.36)*taper*energy;
+            double height=1+Math.Min(600,viewHeight*.55)*taper*energy;
             bars[i]=new(-width/2+position*width,height*scale);
         }
         return bars;

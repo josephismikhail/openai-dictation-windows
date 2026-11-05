@@ -33,7 +33,7 @@ public sealed class PixelVoiceAnimationTests
     {
         var animation=new PixelVoiceAnimation();animation.Observe(.17f,1000);
         var frame=animation.Frame(1016,1920,1080,true);
-        Assert.True(frame.FlatLine);Assert.Empty(frame.Bars);Assert.Equal(346,frame.Width);
+        Assert.True(frame.FlatLine);Assert.Empty(frame.Bars);Assert.Equal(900,frame.Width);
         Assert.Equal(1,frame.StrokeWidth);Assert.Equal(128,frame.WaveAlpha);
     }
     [Fact] public void PhoneGainAndSmoothingProduce49StrongCenteredBars()
@@ -41,8 +41,8 @@ public sealed class PixelVoiceAnimationTests
         var animation=new PixelVoiceAnimation();animation.Observe(.5f,1000);
         var frame=animation.Frame(1016,1920,1080,true);
         Assert.False(frame.FlatLine);Assert.Equal(49,frame.Bars.Length);
-        Assert.Equal(-173,frame.Bars[0].X);Assert.Equal(0,frame.Bars[24].X);Assert.Equal(173,frame.Bars[^1].X);
-        Assert.InRange(frame.Bars[24].Height,95,105);
+        Assert.Equal(-450,frame.Bars[0].X);Assert.Equal(0,frame.Bars[24].X);Assert.Equal(450,frame.Bars[^1].X);
+        Assert.InRange(frame.Bars[24].Height,190,205);
         Assert.Equal(1,frame.Bars[0].Height,6);Assert.Equal(1,frame.Bars[^1].Height,6);
         Assert.InRange(frame.StrokeWidth,1.8,2);Assert.InRange(frame.WaveAlpha,210,220);
     }
@@ -61,7 +61,7 @@ public sealed class PixelVoiceAnimationTests
         var listening=animation.Frame(1016,1920,1080,true);animation.BeginProcessing(1100);
         var halfway=animation.Frame(1325,1920,1080,true);
         Assert.Equal(listening.Bars[24].Height/2,halfway.Bars[24].Height,6);
-        Assert.Equal(-103.8,halfway.Bars[0].X,6);Assert.InRange(halfway.InnerShape!.Value.Alpha,109,110);
+        Assert.Equal(-270,halfway.Bars[0].X,6);Assert.InRange(halfway.InnerShape!.Value.Alpha,109,110);
         var complete=animation.Frame(1550,1920,1080,true);
         Assert.Empty(complete.Bars);Assert.Equal(220,complete.InnerShape!.Value.Alpha);
         Assert.NotEqual(complete.InnerShape.Value.Radius,animation.Frame(2050,1920,1080,true).InnerShape!.Value.Radius);
@@ -78,9 +78,24 @@ public sealed class PixelVoiceAnimationTests
     [Fact] public void NarrowDisplaysStillContainTheWaveAndShape()
     {
         var animation=new PixelVoiceAnimation();animation.Observe(1,1000);
-        var wave=animation.Frame(1016,280,400,true);Assert.Equal(240,wave.Width);
+        var wave=animation.Frame(1016,280,400,true);Assert.Equal(200,wave.Width);
         animation.BeginProcessing(1100);
         Assert.True(animation.Frame(1600,280,400,true).OuterShape!.Value.Radius<140);
+    }
+    [Theory]
+    [InlineData(1920,1080,595)]
+    [InlineData(3840,2160,601)]
+    [InlineData(280,400,221)]
+    public void EnlargedSpeechRemainsInsideItsDesktopHeightLimit(double width,double height,double maximum)
+    {
+        var animation=new PixelVoiceAnimation();PixelVoiceFrame? frame=null;
+        for(int i=0;i<50;i++)
+        {
+            animation.Observe(1,1000+i*16);frame=animation.Frame(1000+i*16,width,height,true);
+        }
+        Assert.NotNull(frame);Assert.InRange(frame.Bars[24].Height,maximum*.99,maximum);
+        Assert.All(frame.Bars,bar=>Assert.InRange(bar.Height,0,maximum));
+        Assert.InRange(frame.Width,1,width-80);
     }
     [Fact] public void NonfiniteLevelsDoNotCorruptTheVisual()
     {
