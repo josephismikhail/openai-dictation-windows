@@ -1,0 +1,72 @@
+# OpenAI Dictation for Windows
+
+A small native Windows app for **Win+H dictation with OpenAI transcription and cleanup**. It shows a compact indicator near the bottom of the active monitor while you speak, then pastes the cleaned text into the app you started from.
+
+This is an independent project, inspired by Handy's minimal recording interface. It is not affiliated with Handy, Microsoft, or OpenAI.
+
+## What it does
+
+1. Place the cursor in a text field and press **Win+H**.
+2. Speak naturally. Pauses do not stop recording.
+3. Press **Win+H** again to finish. The indicator changes to processing.
+4. The app cleans up the transcript and pastes the result. The indicator disappears.
+
+Use the indicator's cancel control or **Escape** during a recording to cancel. The tray menu opens settings or exits the app. The microphone opens only during a recording; there is no always-listening mode.
+
+Cleanup removes filler words, applies explicit spoken corrections, and formats punctuation and lists. Add preferred names and spellings in settings. Like any speech model, it can make mistakes: review text before sending it. Dictation does not press Send or submit forms.
+
+## Requirements
+
+- Windows 10 or Windows 11, x64.
+- .NET 9 Desktop Runtime to run the framework-dependent build; .NET 9 SDK to build it.
+- A microphone, internet access, and your own OpenAI API key with available API credit.
+
+ChatGPT subscription usage and API billing are separate. A dedicated API key makes it easier to identify this app's usage in OpenAI's usage dashboard.
+
+## Build and install
+
+```powershell
+dotnet restore
+dotnet test
+dotnet publish src/OpenAIDictation.Windows -c Release -r win-x64 --self-contained false -o artifacts/publish
+./scripts/install.ps1
+```
+
+The installer places the app under `%LOCALAPPDATA%\OpenAIDictation\app` and adds a per-user startup shortcut. It does not require administrator access.
+
+If your existing Handy helper already captures Win+H, use `./scripts/install.ps1 -ReplaceHandy`. This stops that specific helper and backs up its startup shortcut. It leaves the Handy installation available for rollback. Avoid running two apps that intercept the same shortcut.
+
+Open **Settings** from the tray menu, enter your own API key, and save it. Keys are encrypted using Windows DPAPI for the current account at `%LOCALAPPDATA%\OpenAIDictation\credential.dpapi`. The key is never included in source code or a release binary.
+
+## Interface
+
+The recording indicator is a small rounded pill with a live waveform, a status dot, and a cancel button. Processing uses a spinner. It is positioned near the bottom of the active monitor and does not take keyboard focus from your editor. The app is native WPF; it does not embed a browser or download a local language model.
+
+## OpenAI processing and privacy
+
+The phone or laptop does not run these models locally. This app connects directly to OpenAI, without a project-operated proxy or account service:
+
+- Live transcription: `gpt-live-transcribe`, PCM audio at 24 kHz, mono, 16-bit.
+- File transcription fallback: `gpt-transcribe`.
+- Cleanup: `gpt-6.1-sol`, low reasoning effort, requesting the `ultrafast` service tier.
+- Responses request `store: false`; this does not override OpenAI's applicable retention or billing terms.
+
+Audio, transcripts, vocabulary, and cleanup instructions are sent to OpenAI when you use dictation. They are not sent to the repository maintainer. Audio is buffered in memory; the application does not maintain a transcript history or telemetry service. The app temporarily uses the Windows clipboard to paste, then restores it when safe. Applications, clipboard managers, and Windows clipboard history may independently observe clipboard contents.
+
+The microphone permission, networking, global shortcut, and clipboard behavior are explained in [SECURITY.md](SECURITY.md). Implementation details and tests are in [DEVELOPMENT.md](DEVELOPMENT.md).
+
+## Limits
+
+- This app replaces Windows' normal Win+H behavior while it is running. Exit it to release the shortcut.
+- Text insertion depends on the destination accepting a standard paste. Elevated apps, games, protected fields, remote desktops, and custom editors may restrict automation.
+- It verifies the destination before pasting; if you switch apps, it should refuse to paste into a different window.
+- The cleanup model can change meaning or miss names despite instructions. Vocabulary hints improve recognition but cannot guarantee perfect spelling.
+- Availability, latency, and charges depend on the API models and your account. Ultrafast is a requested service tier, not an application-level speed guarantee.
+
+## Development and licensing
+
+Work on a feature branch, add meaningful tests, and open a pull request. Never commit API keys, private recordings, local configuration, build output, or signing material. Public CI uses synthetic data and no real API credentials.
+
+Licensed under GPL-3.0-only. The interface takes inspiration from the open-source [Handy project](https://github.com/cjpais/Handy); this app is independently implemented in C# and WPF. API protocol behavior also follows our [Android dictation project](https://github.com/josephismikhail/gboard-openai-dictation).
+
+Official API references: [Realtime transcription](https://developers.openai.com/api/docs/guides/realtime-transcription), [Ultrafast mode](https://developers.openai.com/api/docs/guides/ultrafast-mode).
