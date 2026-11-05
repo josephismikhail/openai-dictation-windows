@@ -1,4 +1,6 @@
 using System.Runtime.InteropServices;
+using IMMDeviceEnumerator=OpenAIDictation.Windows.CoreAudioDevices.IDeviceEnumerator;
+using IMMDevice=OpenAIDictation.Windows.CoreAudioDevices.IDevice;
 
 namespace OpenAIDictation.Windows;
 
@@ -17,7 +19,7 @@ internal sealed class CoreAudioCuePlatform : IRecordingCuePlatform
             IMMDeviceEnumerator? enumerator=null;
             try
             {
-                enumerator=(IMMDeviceEnumerator)(object)new MMDeviceEnumerator();
+                enumerator=CoreAudioDevices.CreateEnumerator();
                 Check(enumerator.GetDefaultAudioEndpoint(0,1,out device));
                 Check(device.GetId(out string id));Id=id;
                 audio=Activate<IAudioClient>(device);
@@ -153,21 +155,6 @@ internal sealed class CoreAudioCuePlatform : IRecordingCuePlatform
     [StructLayout(LayoutKind.Sequential,Pack=2)] private struct WaveFormat
     {public ushort Tag,Channels;public uint Rate,BytesPerSecond;public ushort BlockAlign,Bits,Extra;}
 
-    [ComImport,Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")] private sealed class MMDeviceEnumerator {}
-    [ComImport,Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IMMDeviceEnumerator
-    {
-        [PreserveSig]int EnumAudioEndpoints(int flow,uint mask,out nint devices);
-        [PreserveSig]int GetDefaultAudioEndpoint(int flow,int role,out IMMDevice device);
-    }
-    [ComImport,Guid("D666063F-1587-4E43-81F1-B948E807363F"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IMMDevice
-    {
-        [PreserveSig]int Activate(ref Guid id,uint context,nint parameters,[MarshalAs(UnmanagedType.IUnknown)]out object result);
-        [PreserveSig]int OpenPropertyStore(int access,out nint properties);
-        [PreserveSig]int GetId([MarshalAs(UnmanagedType.LPWStr)]out string id);
-        [PreserveSig]int GetState(out uint state);
-    }
     [ComImport,Guid("1CB9AD4C-DBFA-4C32-B178-C2F568A703B2"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface IAudioClient
     {

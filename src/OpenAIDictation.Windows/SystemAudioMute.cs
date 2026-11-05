@@ -1,4 +1,7 @@
 using System.Runtime.InteropServices;
+using IMMDeviceEnumerator=OpenAIDictation.Windows.CoreAudioDevices.IDeviceEnumerator;
+using IMMDeviceCollection=OpenAIDictation.Windows.CoreAudioDevices.IDeviceCollection;
+using IMMDevice=OpenAIDictation.Windows.CoreAudioDevices.IDevice;
 
 namespace OpenAIDictation.Windows;
 
@@ -23,10 +26,10 @@ internal sealed class SystemAudioMute : IDisposable
             Refresh();
             if(monitorChanges)monitor=new Timer(_=>{try{Refresh();}catch{try{Failed?.Invoke();}catch{}}},null,250,250);
         }
-        catch
+        catch(Exception error)
         {
             Dispose();
-            throw new InvalidOperationException("Windows could not mute audio for recording. Please try again.");
+            throw new InvalidOperationException("Windows could not mute audio for recording. Please try again.",error);
         }
     }
     /// <summary>Also catches newly connected or newly active output devices while listening.</summary>
@@ -126,7 +129,7 @@ internal sealed class CoreAudioOutputSource : IAudioOutputSource
         var result=new List<IAudioOutput>();IMMDeviceEnumerator? enumerator=null;IMMDeviceCollection? collection=null;
         try
         {
-            enumerator=(IMMDeviceEnumerator)(object)new MMDeviceEnumerator();
+            enumerator=CoreAudioDevices.CreateEnumerator();
             Marshal.ThrowExceptionForHR(enumerator.EnumAudioEndpoints(0,1,out collection));
             Marshal.ThrowExceptionForHR(collection.GetCount(out uint count));
             for(uint i=0;i<count;i++)
@@ -162,26 +165,6 @@ internal sealed class CoreAudioOutputSource : IAudioOutputSource
             Marshal.ThrowExceptionForHR(endpoint.SetMute(value,ref context));
         }
         public void Dispose(){var old=endpoint;endpoint=null;Release(old);}
-    }
-    [ComImport,Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")] private sealed class MMDeviceEnumerator {}
-    [ComImport,Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IMMDeviceEnumerator
-    {
-        [PreserveSig]int EnumAudioEndpoints(int dataFlow,uint stateMask,out IMMDeviceCollection devices);
-    }
-    [ComImport,Guid("0BD7A1BE-7A1A-44DB-8397-CC5392387B5E"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IMMDeviceCollection
-    {
-        [PreserveSig]int GetCount(out uint count);
-        [PreserveSig]int Item(uint index,out IMMDevice device);
-    }
-    [ComImport,Guid("D666063F-1587-4E43-81F1-B948E807363F"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IMMDevice
-    {
-        [PreserveSig]int Activate(ref Guid iid,uint context,nint parameters,[MarshalAs(UnmanagedType.IUnknown)]out object instance);
-        [PreserveSig]int OpenPropertyStore(int access,out nint properties);
-        [PreserveSig]int GetId([MarshalAs(UnmanagedType.LPWStr)]out string id);
-        [PreserveSig]int GetState(out uint state);
     }
     [ComImport,Guid("5CDF2C82-841E-4546-9722-0CF74078229A"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface IAudioEndpointVolume
