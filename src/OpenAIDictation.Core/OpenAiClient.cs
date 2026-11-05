@@ -55,6 +55,7 @@ public sealed class OpenAiClient : IDisposable
                         if (Text(part, "type") == "output_text") output.Append(Text(part, "text"));
         var cleaned = output.ToString().Trim();
         if (cleaned.Length == 0) throw new DictationException("Cleanup returned no text. Your original transcript is available.");
+        cleaned = PreferredSpelling.Apply(cleaned, options.Keywords);
         var inputTokens = 0; var outputTokens = 0;
         if (root.TryGetProperty("usage", out var usage))
         {
