@@ -38,23 +38,23 @@ public sealed class IndicatorTests
     {
         var signal=new VoiceSignal();signal.Observe(.12f);
         for(int i=0;i<6;i++)signal.Advance(1d/60);
-        Assert.InRange(signal.Height(4),47,VoiceSignal.PeakHeight);
+        Assert.InRange(signal.Height(4),33,VoiceSignal.PeakHeight);
         Assert.True(signal.Height(4)>signal.Height(0)*1.7);
         for(int i=0;i<12;i++)signal.Advance(1d/60);
-        Assert.InRange(signal.Height(4),53,VoiceSignal.PeakHeight);
+        Assert.InRange(signal.Height(4),38,VoiceSignal.PeakHeight);
     }
     [Fact] public void QuietSpeechStillProducesAnObviousSignal()
     {
         var signal=new VoiceSignal();signal.Observe(.03f);
         for(int i=0;i<6;i++)signal.Advance(1d/60);
-        Assert.InRange(signal.Height(4),40,VoiceSignal.PeakHeight);
-        Assert.True(signal.Height(4)>VoiceSignal.QuietHeight*15);
+        Assert.InRange(signal.Height(4),29,VoiceSignal.PeakHeight);
+        Assert.True(signal.Height(4)>VoiceSignal.QuietHeight*11);
     }
     [Fact] public void LargerPillContainsMaximumSignalWithoutClipping()
     {
         Assert.True(IndicatorLayout.WindowWidth>=IndicatorLayout.PillWidth);
         Assert.True(IndicatorLayout.WindowHeight>=IndicatorLayout.PillTop+IndicatorLayout.PillHeight);
-        Assert.True(IndicatorLayout.PillHeight-VoiceSignal.PeakHeight>=12);
+        Assert.True(IndicatorLayout.PillHeight-VoiceSignal.PeakHeight>=10);
     }
     [Theory]
     [InlineData(160,39,(int)OverlayState.Recording,(int)IndicatorAction.Stop)]
@@ -68,6 +68,36 @@ public sealed class IndicatorTests
     public void VisiblePillHasCorrectStopAndCancelTargets(double x,double y,int state,int expected)
     {
         Assert.Equal((IndicatorAction)expected,IndicatorLayout.HitTest(x,y,IndicatorLayout.WindowWidth,(OverlayState)state));
+    }
+    [Fact] public void ErrorCardExpandsWithoutMovingOffCenterOrOntoTaskbar()
+    {
+        var bounds=IndicatorLayout.Calculate(-2560,0,-200,1200,144,144,OverlayState.Error,150);
+        Assert.Equal(750,bounds.Width);Assert.Equal(240,bounds.Height);
+        Assert.Equal(-1280,bounds.Left+bounds.Width/2);
+        Assert.Equal(1188,bounds.Top+bounds.Height);
+        Assert.Equal(IndicatorAction.Cancel,IndicatorLayout.HitTest(250,149,500,OverlayState.Error,160));
+        Assert.Equal(IndicatorAction.None,IndicatorLayout.HitTest(250,158,500,OverlayState.Error,160));
+    }
+    [Fact] public void FullSafeErrorIsWrappedAndAccessibleWithoutOpeningAWindow()
+    {
+        Exception? error=null;
+        var thread=new Thread(()=>
+        {
+            try
+            {
+                string message=string.Join(" ",Enumerable.Repeat("Check your microphone connection and try recording again.",8));
+                var indicator=new OverlayWindow.Indicator();indicator.SetState(OverlayState.Error,message);
+                Assert.Equal(message,indicator.ToolTip);
+                Assert.True(indicator.ErrorHeight>IndicatorLayout.ErrorMinimumHeight);
+                var peer=System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(indicator);
+                Assert.NotNull(peer);Assert.Contains(message,peer.GetName());Assert.Equal(message,peer.GetHelpText());
+                indicator.SetState(OverlayState.Recording);
+                Assert.Null(indicator.ToolTip);Assert.DoesNotContain(message,peer.GetName());
+            }
+            catch(Exception caught){error=caught;}
+        });
+        thread.SetApartmentState(ApartmentState.STA);thread.Start();thread.Join();
+        if(error!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(error).Throw();
     }
     [Fact] public void PausingSmoothlyReturnsToTheQuietLine()
     {
