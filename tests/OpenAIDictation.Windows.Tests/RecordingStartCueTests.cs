@@ -24,7 +24,7 @@ public sealed class RecordingStartCueTests
     private sealed class Cue(Output speaker):IRecordingCueOutput,IRecordingCuePlatform
     {
         internal readonly List<string> Events=[];
-        internal Action? Protected,Playing;
+        internal Action? Protected,Playing,BeforeQueue;
         internal Action? NotificationFailure;
         internal bool ProtectionFails,PlaybackFails,Opened,OtherSessionsMuted;
         internal readonly ManualResetEventSlim PlayingEvent=new();
@@ -37,11 +37,13 @@ public sealed class RecordingStartCueTests
             NotificationFailure=failed;OtherSessionsMuted=true;Protected?.Invoke();
             return new Cleanup(()=>{Events.Add("restore sessions");OtherSessionsMuted=false;});
         }
-        public void Play(CancellationToken token)
+        public void Play(CancellationToken token,Action playbackQueued)
         {
             Assert.False(speaker.IsMuted);Assert.True(OtherSessionsMuted);
-            Events.Add("play");PlayingEvent.Set();Playing?.Invoke();
+            Events.Add("play");BeforeQueue?.Invoke();
             if(PlaybackFails)throw new InvalidOperationException();
+            token.ThrowIfCancellationRequested();playbackQueued();
+            PlayingEvent.Set();Playing?.Invoke();
             token.ThrowIfCancellationRequested();
         }
         public void Dispose()=>Events.Add("close output");
@@ -89,6 +91,33 @@ public sealed class RecordingStartCueTests
         Assert.True(prepared.Wait(3000));Assert.True(speaker.IsMuted);Assert.DoesNotContain("play",output.Events);
         cue.SignalMicrophoneReady();cue.SignalMicrophoneReady();await cue.Completion;
         Assert.Single(output.Events,e=>e=="play");Assert.Equal("played",cue.Outcome);Assert.True(speaker.IsMuted);
+    }
+    [Fact] public async Task PresentationWaitsForAudioQueueInsteadOfMicrophoneReadiness()
+    {
+        var speaker=new Output("speaker");using var mute=SystemAudioMute.Acquire(new Source(speaker));var output=new Cue(speaker);
+        using var reachedQueue=new ManualResetEventSlim();using var releaseQueue=new ManualResetEventSlim();
+        output.BeforeQueue=()=>{reachedQueue.Set();releaseQueue.Wait(3000);};
+        using var cue=RecordingStartCue.Prepare(mute,output,CancellationToken.None);
+        cue.SignalMicrophoneReady();
+        try{Assert.True(reachedQueue.Wait(3000));Assert.False(cue.PresentationReady.IsCompleted);}
+        finally{releaseQueue.Set();}
+        await cue.PresentationReady.WaitAsync(TimeSpan.FromSeconds(3));await cue.Completion;
+        Assert.Equal("played",cue.Outcome);
+    }
+    [Theory] [InlineData(true,false)] [InlineData(false,true)]
+    public async Task UnavailableAudioStillCompletesPresentation(bool muted,bool failure)
+    {
+        var speaker=new Output("speaker",muted);using var mute=SystemAudioMute.Acquire(new Source(speaker));
+        var output=new Cue(speaker){ProtectionFails=failure};
+        using var cue=new RecordingStartCue(mute,output,CancellationToken.None);
+        await cue.PresentationReady.WaitAsync(TimeSpan.FromSeconds(3));await cue.Completion;
+        Assert.DoesNotContain("play",output.Events);
+    }
+    [Fact] public void CancelingBeforeAudioQueueCompletesPresentationWithoutPlaying()
+    {
+        var speaker=new Output("speaker");using var mute=SystemAudioMute.Acquire(new Source(speaker));var output=new Cue(speaker);
+        var cue=RecordingStartCue.Prepare(mute,output,CancellationToken.None);cue.Dispose();
+        Assert.True(cue.PresentationReady.IsCompleted);Assert.DoesNotContain("play",output.Events);
     }
     [Fact] public void CancellingPreparationAfterMicrophoneFailureNeverPlays()
     {

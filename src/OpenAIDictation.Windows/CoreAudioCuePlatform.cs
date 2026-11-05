@@ -42,7 +42,7 @@ internal sealed class CoreAudioCuePlatform : IRecordingCuePlatform
             ObjectDisposedException.ThrowIf(device==null,this);
             return new SessionGuard(Activate<IAudioSessionManager2>(device),failed);
         }
-        public void Play(CancellationToken token)
+        public void Play(CancellationToken token,Action playbackQueued)
         {
             ObjectDisposedException.ThrowIf(audio==null || render==null,this);
             float[] samples=StartCueSound.Samples();uint frames=(uint)samples.Length/2;
@@ -52,6 +52,7 @@ internal sealed class CoreAudioCuePlatform : IRecordingCuePlatform
             Check(render.GetBuffer(frames,out nint buffer));
             try{Marshal.Copy(samples,0,buffer,samples.Length);}
             finally{Check(render.ReleaseBuffer(frames,0));}
+            playbackQueued();
             var timeout=System.Diagnostics.Stopwatch.StartNew();
             try
             {
