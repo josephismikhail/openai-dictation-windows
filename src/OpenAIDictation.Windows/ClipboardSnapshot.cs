@@ -1,5 +1,6 @@
 using System.Collections.Specialized;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Media.Imaging;
 
@@ -9,13 +10,19 @@ namespace OpenAIDictation.Windows;
 internal static class ClipboardSnapshot
 {
     private const long MaximumFormatBytes=64L*1024*1024;
-    internal static DataObject? Capture(IDataObject? source)
+    internal static DataObject? Capture(IDataObject? source)=>Capture(source,ClipboardProtection.IsUnprotected);
+    internal static DataObject? Capture(IDataObject? source,Func<bool> isUnprotected)
     {
         if(source==null)return null;
         var snapshot=new DataObject();
         foreach(string format in source.GetFormats(false))
         {
-            object? value=source.GetData(format,false);
+            object? value;
+            try{value=source.GetData(format,false);}
+            catch(COMException error) when(error.HResult==unchecked((int)0x800401D3)
+                && format.Equals("EnterpriseDataProtectionId",StringComparison.OrdinalIgnoreCase) && isUnprotected())
+            {continue;}
+            if(value==null && format.Equals("EnterpriseDataProtectionId",StringComparison.OrdinalIgnoreCase) && isUnprotected())continue;
             if(value==null)throw new InvalidOperationException("The current clipboard could not be preserved. Copy plain text or clear the clipboard, then try again.");
             snapshot.SetData(format,Clone(value),false);
         }
