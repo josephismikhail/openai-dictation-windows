@@ -7,7 +7,7 @@ This is an independent project, inspired by Handy's minimal recording interface.
 ## What it does
 
 1. Place the cursor in a text field and press **Win+H**.
-2. Speak naturally. Pauses do not stop recording.
+2. A short chime confirms that the microphone is listening. Speak naturally; pauses do not stop recording.
 3. Press **Win+H** again to finish. The indicator changes to processing.
 4. The app cleans up the transcript and pastes the result. The indicator disappears.
 
@@ -53,6 +53,8 @@ The recording indicator is a small rounded pill with a voice-driven waveform, a 
 ## Audio while recording
 
 Starting dictation temporarily mutes every active Windows audio output, including playback from browsers, Spotify, and other apps. It preserves devices that were already muted and does not change volume levels. Audio returns after microphone capture stops, before transcription and cleanup finish. Canceling or normally exiting also restores the previous state. Newly active outputs are checked while recording.
+
+A quiet, locally generated start chime plays once the microphone is ready. Existing playback stays silenced during the chime; new audio sessions are silenced as Windows reports them. It respects an already-muted output and is skipped if Windows cannot safely play it. The visual recording indicator still works when the chime is unavailable; there is no stop or processing sound.
 
 This changes Windows' output mute state. If the process is forcibly terminated or crashes while recording, Windows may remain muted; unmute it using the system volume control.
 
