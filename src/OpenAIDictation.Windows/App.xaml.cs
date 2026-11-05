@@ -96,6 +96,7 @@ public partial class App:System.Windows.Application
             {
                 if(current==session && !session.Processing)Fail(session,"Windows could not keep playback muted. Please try again.");
             });
+            session.StartCue=RecordingStartCue.Prepare(session.AudioMute,session.Cancel.Token);
             session.Connection=session.Live.StartAsync(session.Cancel.Token);
             session.Sender=Task.Run(async()=>
             {
@@ -121,8 +122,7 @@ public partial class App:System.Windows.Application
                     Dispatcher.BeginInvoke(()=>{if(current==session && !session.Processing)_=StopAsync();});
             };
             session.Recorder.Level+=level=>Dispatcher.BeginInvoke(()=>{if(current==session)overlay?.SetLevel(level);});
-            session.Recorder.Start();overlay!.Present(OverlayState.Recording,session.Target);
-            session.StartCue=new RecordingStartCue(session.AudioMute,session.Cancel.Token);
+            session.Recorder.Start();session.StartCue.SignalMicrophoneReady();overlay!.Present(OverlayState.Recording,session.Target);
             _=ObserveConnection(session);_=LimitRecording(session);
         }
         catch(Exception ex){if(started!=null)Fail(started,SafeMessage(ex));else{ShowError(SafeMessage(ex));ShowSettings();}}
