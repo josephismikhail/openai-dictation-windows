@@ -97,15 +97,42 @@ public class RealtimeTests
         var start = session.StartAsync(cancellation.Token); cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start.WaitAsync(TimeSpan.FromSeconds(2)));
     }
+    [Theory] [InlineData(true)] [InlineData(false)]
+    public async Task SetupFailureRaceUsesCallerCancellationState(bool cancelCaller)
+    {
+        using var transport = new FakeTransport();
+        var setupSent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resumeSend = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var readerFailed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        transport.SendOverride = async () => { setupSent.TrySetResult(); await resumeSend.Task; };
+        transport.OnAbort = () => readerFailed.TrySetResult();
+        using var cancellation = new CancellationTokenSource();
+        await using var session = new RealtimeSession("test", new(), transport);
+        var start = session.StartAsync(cancellation.Token);
+        try
+        {
+            await setupSent.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            transport.Feed("{\"type\":\"error\"}");
+            // Force the reader to fault _ready first, then optionally cancel the
+            // caller before StartCoreAsync observes that provider exception.
+            await readerFailed.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            if (cancelCaller) cancellation.Cancel();
+        }
+        finally { resumeSend.TrySetResult(); }
+        if (cancelCaller) await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start.WaitAsync(TimeSpan.FromSeconds(2)));
+        else await Assert.ThrowsAsync<DictationException>(() => start.WaitAsync(TimeSpan.FromSeconds(2)));
+    }
 
     private sealed class FakeTransport : IRealtimeTransport
     {
         private readonly Channel<(byte[] Data, WebSocketMessageType Type, bool End)> _frames = Channel.CreateUnbounded<(byte[], WebSocketMessageType, bool)>();
         private readonly SemaphoreSlim _sentSignal = new(0);
         public ConcurrentQueue<string> Sent { get; } = new();
+        public Func<Task>? SendOverride { get; set; }
+        public Action? OnAbort { get; set; }
         public string[] Types => Sent.Select(s => JsonDocument.Parse(s).RootElement.GetProperty("type").GetString()!).ToArray();
         public Task ConnectAsync(Uri uri, string apiKey, CancellationToken ct) { Assert.Equal("api.openai.com", uri.Host); return Task.CompletedTask; }
-        public Task SendAsync(byte[] data, CancellationToken ct) { Sent.Enqueue(Encoding.UTF8.GetString(data)); _sentSignal.Release(); return Task.CompletedTask; }
+        public Task SendAsync(byte[] data, CancellationToken ct) { Sent.Enqueue(Encoding.UTF8.GetString(data)); _sentSignal.Release(); return SendOverride?.Invoke() ?? Task.CompletedTask; }
         public async Task<WebSocketReceiveResult> ReceiveAsync(byte[] buffer, CancellationToken ct)
         {
             var frame = await _frames.Reader.ReadAsync(ct); frame.Data.CopyTo(buffer, 0); return new(frame.Data.Length, frame.Type, frame.End);
@@ -118,7 +145,7 @@ public class RealtimeTests
         public void Close() => _frames.Writer.TryWrite(([], WebSocketMessageType.Close, true));
         public async Task WaitSent(int count)
         { using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2)); while (Sent.Count < count) await _sentSignal.WaitAsync(timeout.Token); }
-        public void Abort() { }
+        public void Abort() { OnAbort?.Invoke(); }
         public void Dispose() { }
     }
 }

@@ -63,21 +63,29 @@ public sealed class OpenAiClient : IDisposable
         return new CleanupResult(cleaned, inputTokens, outputTokens, Text(root, "model") is { Length: > 0 } model ? model : options.CleanupModel);
     }
 
-    /// <summary>Upload the recording as WAV only if live transcription failed. PCM is 24 kHz mono signed 16-bit little endian.</summary>
+    /// <summary>Fallback WAV transcription. Long recordings are uploaded in bounded sequential chunks and joined in order.</summary>
     public async Task<string> TranscribeAsync(ReadOnlyMemory<byte> pcm, string apiKey, DictationOptions options, CancellationToken ct = default)
     {
         ValidateKey(apiKey); options.Validate();
-        using var form = new MultipartFormDataContent();
-        form.Add(new StringContent("gpt-transcribe"), "model");
-        form.Add(new StringContent("en"), "language");
-        if (options.Keywords.Length > 0) form.Add(new StringContent(string.Join(", ", options.Keywords)), "prompt");
-        var audio = new ByteArrayContent(WaveFile.Create(pcm.Span)); audio.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
-        form.Add(audio, "file", "dictation.wav");
-        using var request = NewRequest("https://api.openai.com/v1/audio/transcriptions", apiKey, form);
-        using var response = await SendAsync(request, ct).ConfigureAwait(false);
-        using var doc = await ReadJsonAsync(response, ct).ConfigureAwait(false);
-        var text = Text(doc.RootElement, "text").Trim();
-        return text.Length > 0 ? text : throw new DictationException("No speech was detected.");
+        var transcripts = new List<string>();
+        foreach (var chunk in WaveFile.UploadChunks(pcm))
+        {
+            ct.ThrowIfCancellationRequested();
+            using var form = new MultipartFormDataContent();
+            form.Add(new StringContent("gpt-transcribe"), "model");
+            form.Add(new StringContent("en"), "language");
+            if (options.Keywords.Length > 0) form.Add(new StringContent(string.Join(", ", options.Keywords)), "prompt");
+            var audio = new ByteArrayContent(WaveFile.Create(chunk.Span)); audio.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
+            form.Add(audio, "file", "dictation.wav");
+            using var request = NewRequest("https://api.openai.com/v1/audio/transcriptions", apiKey, form);
+            using var response = await SendAsync(request, ct).ConfigureAwait(false);
+            using var doc = await ReadJsonAsync(response, ct).ConfigureAwait(false);
+            if (!doc.RootElement.TryGetProperty("text", out var transcript) || transcript.ValueKind != JsonValueKind.String)
+                throw new DictationException("OpenAI returned an unreadable transcription response.");
+            var text = transcript.GetString()!.Trim();
+            if (text.Length > 0) transcripts.Add(text);
+        }
+        return transcripts.Count > 0 ? string.Join(" ", transcripts) : throw new DictationException("No speech was detected.");
     }
 
     private static HttpRequestMessage NewRequest(string url, string key, HttpContent content)

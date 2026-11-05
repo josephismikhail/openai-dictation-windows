@@ -58,9 +58,11 @@ public sealed class RealtimeSession : IAsyncDisposable
             await _ready.Task.WaitAsync(setup.Token).ConfigureAwait(false);
             _writerTask = WriteLoopAsync();
         }
-        catch (Exception e)
+        catch (Exception)
         {
-            var canceled = e is OperationCanceledException && (_callerToken.IsCancellationRequested || _disposed);
+            // Reader failure and caller cancellation can race. Classify by the
+            // caller/session state, not whichever exception won the ready task.
+            var canceled = _callerToken.IsCancellationRequested || _disposed;
             Fail(canceled
                 ? new OperationCanceledException(_lifetime.Token)
                 : new DictationException("Live transcription could not connect. Please try again."));
