@@ -25,9 +25,14 @@ internal sealed class CoreAudioCuePlatform : IRecordingCuePlatform
                 audio=Activate<IAudioClient>(device);
                 var format=new WaveFormat{Tag=3,Channels=2,Rate=48000,BytesPerSecond=384000,BlockAlign=8,Bits=32};
                 // Shared mode with Windows' format conversion. Fails safely if an exclusive owner prevents mixing.
-                Check(audio.Initialize(0,0x88000000,2_000_000,0,ref format,0));
+                Check(audio.Initialize(0,0x88000000,8_000_000,0,ref format,0));
                 Guid renderId=typeof(IAudioRenderClient).GUID;
                 Check(audio.GetService(ref renderId,out object renderer));render=(IAudioRenderClient)renderer;
+                // Start with an EMPTY buffer while the endpoint is still muted.
+                // Some drivers block Start for hundreds of milliseconds and consume
+                // queued samples during that call. Preparing silence here avoids
+                // clipping the cue or adding that delay after microphone readiness.
+                Check(audio.Start());
             }
             catch{Dispose();throw;}
             finally{Release(enumerator);}
@@ -40,28 +45,27 @@ internal sealed class CoreAudioCuePlatform : IRecordingCuePlatform
         public void Play(CancellationToken token)
         {
             ObjectDisposedException.ThrowIf(audio==null || render==null,this);
-            float[] samples=StartCueTone.Samples();uint frames=(uint)samples.Length/2;
-            Check(audio.GetBufferSize(out uint available));
-            if(frames>available)throw new InvalidOperationException("The output buffer is too small for the cue.");
+            float[] samples=StartCueSound.Samples();uint frames=(uint)samples.Length/2;
+            Check(audio.GetBufferSize(out uint capacity));
+            if(frames>capacity)throw new InvalidOperationException("The output buffer is too small for the start sound.");
             token.ThrowIfCancellationRequested();
             Check(render.GetBuffer(frames,out nint buffer));
             try{Marshal.Copy(samples,0,buffer,samples.Length);}
             finally{Check(render.ReleaseBuffer(frames,0));}
-            Check(audio.Start());
+            var timeout=System.Diagnostics.Stopwatch.StartNew();
             try
             {
-                var timeout=System.Diagnostics.Stopwatch.StartNew();
                 do
                 {
-                    if(token.WaitHandle.WaitOne(10))token.ThrowIfCancellationRequested();
+                    if(token.WaitHandle.WaitOne(5))token.ThrowIfCancellationRequested();
                     Check(audio.GetCurrentPadding(out uint remaining));
                     if(remaining==0)return;
-                }while(timeout.ElapsedMilliseconds<1000);
-                throw new InvalidOperationException("The audio cue did not finish.");
+                }while(timeout.ElapsedMilliseconds<2000);
+                throw new InvalidOperationException("The start sound did not finish.");
             }
             finally{audio.Stop();audio.Reset();}
         }
-        public void Dispose(){Release(render);render=null;Release(audio);audio=null;Release(device);device=null;}
+        public void Dispose(){if(audio!=null){try{audio.Stop();audio.Reset();}catch{}}Release(render);render=null;Release(audio);audio=null;Release(device);device=null;}
     }
 
     /// <summary>Muting sessions is only needed for the short audible cue; endpoint mute owns the rest.</summary>
@@ -229,20 +233,5 @@ internal sealed class CoreAudioCuePlatform : IRecordingCuePlatform
     private interface IAudioSessionNotification
     {
         [PreserveSig]int OnSessionCreated(IAudioSessionControl control);
-    }
-}
-
-internal static class StartCueTone
-{
-    internal static float[] Samples()
-    {
-        const int frames=5760;var samples=new float[frames*2];
-        for(int frame=0;frame<frames;frame++)
-        {
-            double t=frame/48000.0,fade=Math.Min(1,Math.Min(frame/480.0,(frames-1-frame)/960.0));
-            float value=(float)(.255*fade*(Math.Sin(2*Math.PI*660*t)+.45*Math.Sin(2*Math.PI*990*t)));
-            samples[2*frame]=samples[2*frame+1]=value;
-        }
-        return samples;
     }
 }

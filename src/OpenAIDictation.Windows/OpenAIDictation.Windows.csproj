@@ -2,6 +2,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenAIDictation.Core\OpenAIDictation.Core.csproj" />
+    <EmbeddedResource Include="Assets\handy-marimba-start.wav" LogicalName="OpenAIDictation.HandyStart.wav" />
+    <None Update="Assets\Handy-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <PropertyGroup>

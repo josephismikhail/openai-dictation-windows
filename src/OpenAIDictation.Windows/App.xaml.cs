@@ -17,6 +17,7 @@ public partial class App:System.Windows.Application
     private SettingsWindow? settings;
     private Session? current;
     private string recoveryText="";
+    private int errorGeneration;
     private string PipeName=>"OpenAIDictation."+Environment.UserName;
     private sealed class Session
     {
@@ -34,6 +35,7 @@ public partial class App:System.Windows.Application
         internal readonly object CaptureGate=new();
         internal Task Connection=Task.CompletedTask,Sender=Task.CompletedTask;
         internal bool Processing;
+        internal DictationStage Stage=DictationStage.Initialization;
         internal volatile bool LiveFailed;
         internal int Disposed;
         internal int LimitSignaled;
@@ -96,6 +98,7 @@ public partial class App:System.Windows.Application
             {
                 if(current==session && !session.Processing)Fail(session,"Windows could not keep playback muted. Please try again.");
             });
+            session.StartCue=RecordingStartCue.Prepare(session.AudioMute,session.Cancel.Token);
             session.Connection=session.Live.StartAsync(session.Cancel.Token);
             session.Sender=Task.Run(async()=>
             {
@@ -121,11 +124,11 @@ public partial class App:System.Windows.Application
                     Dispatcher.BeginInvoke(()=>{if(current==session && !session.Processing)_=StopAsync();});
             };
             session.Recorder.Level+=level=>Dispatcher.BeginInvoke(()=>{if(current==session)overlay?.SetLevel(level);});
-            session.Recorder.Start();overlay!.Present(OverlayState.Recording,session.Target);
-            session.StartCue=new RecordingStartCue(session.AudioMute,session.Cancel.Token);
+            session.Recorder.Start();session.StartCue.SignalMicrophoneReady();
+            session.Stage=DictationStage.Recording;overlay!.Present(OverlayState.Recording,session.Target);
             _=ObserveConnection(session);_=LimitRecording(session);
         }
-        catch(Exception ex){if(started!=null)Fail(started,SafeMessage(ex));else{ShowError(SafeMessage(ex));ShowSettings();}}
+        catch(Exception ex){if(started!=null)Fail(started,DictationFailure.Describe(ex,started.Stage),ex);else{var message=DictationFailure.Describe(ex,DictationStage.Initialization);DictationFailure.Save(DictationStage.Initialization,message,ex);ShowError(message);ShowSettings();}}
     }
     private async Task ObserveConnection(Session session)
     {
@@ -141,22 +144,26 @@ public partial class App:System.Windows.Application
         string recovery="";
         try
         {
+            session.Stage=DictationStage.Stopping;
             overlay!.Present(OverlayState.Processing,session.Target);
             StopCapture(session);
             session.Audio.Writer.TryComplete();await session.Sender;
+            session.Stage=DictationStage.Transcription;
             string raw="";
             try{await session.Connection;if(!session.LiveFailed)raw=await session.Live.CompleteAsync(session.Cancel.Token);}
             catch when(!session.Cancel.IsCancellationRequested){session.LiveFailed=true;}
             if(session.LiveFailed || string.IsNullOrWhiteSpace(raw))raw=await client.TranscribeAsync(session.Recorded.ToArray(),session.Key,session.Options,session.Cancel.Token);
             if(string.IsNullOrWhiteSpace(raw))throw new InvalidOperationException("No speech was detected.");
             recovery=raw;
+            session.Stage=DictationStage.Cleanup;
             var cleaned=await client.CleanupAsync(raw,session.Key,session.Options,session.Cancel.Token);
             recovery=cleaned.Text;
             if(current!=session || session.Cancel.IsCancellationRequested)return;
+            session.Stage=DictationStage.Insertion;
             await TextInserter.InsertAsync(session.Focus,cleaned.Text,session.Cancel.Token);
             if(current==session){current=null;recoveryText="";overlay.Hide();}
         }
-        catch(OperationCanceledException){}catch(Exception ex){if(current==session && recovery.Length>0)recoveryText=recovery;Fail(session,SafeMessage(ex)+(recovery.Length>0?" Use the tray's Recover last text menu to copy the transcript.":""));}
+        catch(OperationCanceledException){}catch(Exception ex){if(current==session && recovery.Length>0)recoveryText=recovery;Fail(session,DictationFailure.Describe(ex,session.Stage)+(recovery.Length>0?" Use the tray's Recover last text menu to copy the transcript.":""),ex);}
         finally{await DisposeSession(session);}
     }
     private void Cancel()
@@ -173,7 +180,7 @@ public partial class App:System.Windows.Application
             }
         }
     }
-    private void Fail(Session session,string message){if(current!=session)return;Cancel();ShowError(message);}
+    private void Fail(Session session,string message,Exception? error=null){if(current!=session)return;DictationFailure.Save(session.Stage,message,error);Cancel();ShowError(message);}
     private static void StopCapture(Session session)
     {
         lock(session.CaptureGate)
@@ -199,14 +206,13 @@ public partial class App:System.Windows.Application
         session.Cancel.Cancel();try{StopCapture(session);}catch{}session.Audio.Writer.TryComplete();try{await session.Sender;}catch{}
         try{await session.Live.DisposeAsync();}catch{}session.Recorded.Dispose();
     }
-    private static string SafeMessage(Exception ex)=>ex is DictationException or InvalidOperationException?ex.Message:"Dictation failed. Check your connection and OpenAI API settings, then try again.";
     private void ShowError(string message)
     {
         if(lifetime.IsCancellationRequested || Dispatcher.HasShutdownStarted)return;
         try{overlay?.Present(OverlayState.Error,NativeMethods.GetForegroundWindow(),message);}catch{ /* A removed monitor must not interfere with cleanup. */ }
-        try{if(tray!=null){tray.BalloonTipTitle="OpenAI Dictation";tray.BalloonTipText=message;tray.ShowBalloonTip(5000);}}catch(ObjectDisposedException){}_=HideErrorLater();
+        try{if(tray!=null){tray.BalloonTipTitle="OpenAI Dictation";tray.BalloonTipText=message;tray.ShowBalloonTip(5000);}}catch(ObjectDisposedException){}_=HideErrorLater(++errorGeneration);
     }
-    private async Task HideErrorLater(){try{await Task.Delay(5000,lifetime.Token);if(current==null)overlay?.Hide();}catch(OperationCanceledException){}catch(InvalidOperationException){}}
+    private async Task HideErrorLater(int generation){try{await Task.Delay(20000,lifetime.Token);if(current==null && generation==errorGeneration)overlay?.Hide();}catch(OperationCanceledException){}catch(InvalidOperationException){}}
     private async void Preview()
     {
         try{

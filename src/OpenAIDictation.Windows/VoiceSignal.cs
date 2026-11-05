@@ -4,7 +4,7 @@ namespace OpenAIDictation.Windows;
 internal sealed class VoiceSignal
 {
     internal const int BarCount=9;
-    internal const double QuietHeight=2.5,PeakHeight=56;
+    internal const double QuietHeight=2.5,PeakHeight=40;
     private static readonly double[] Shape=[.38,.58,.78,.94,1,.94,.78,.58,.38];
     private readonly double[] history=new double[BarCount];
     private double target,envelope,historyTime;

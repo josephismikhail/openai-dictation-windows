@@ -44,7 +44,9 @@ Open **Settings** from the tray menu, enter your own API key, and save it. Keys 
 
 ## Interface
 
-The recording indicator is a black rounded pill with a white voice-driven waveform, status light, and cancel button. The 300 × 68 DIP surface gives quiet speech a pronounced response, with peaks up to 56 DIP; silence settles to a flat line. Processing uses a white spinner. Click the recording surface to finish, or its right-hand × to cancel. The pill is centered horizontally on the active monitor and sits just above its taskbar, with DPI-aware positioning. It does not take keyboard focus from your editor. The app is native WPF; it does not embed a browser or download a local language model.
+The recording indicator is a black rounded pill with a white voice-driven waveform, status light, and cancel button. The slim 300 × 50 DIP surface gives quiet speech a pronounced response, with peaks up to 40 DIP; silence settles to a flat line. Processing uses a white spinner. Click the recording surface to finish, or its right-hand × to cancel. The pill is centered horizontally on the active monitor and sits just above its taskbar, with DPI-aware positioning. It does not take keyboard focus from your editor. The app is native WPF; it does not embed a browser or download a local language model.
+
+Errors expand into a readable card with the complete safe explanation and next step. The card remains available for 20 seconds unless dismissed or replaced by another recording. The same message is available to screen readers and in the card's tooltip.
 
 ![Recording indicator](docs/images/recording.png)
 
@@ -54,7 +56,7 @@ The recording indicator is a black rounded pill with a white voice-driven wavefo
 
 Starting dictation temporarily mutes every active Windows audio output, including playback from browsers, Spotify, and other apps. It preserves devices that were already muted and does not change volume levels. Audio returns after microphone capture stops, before transcription and cleanup finish. Canceling or normally exiting also restores the previous state. Newly active outputs are checked while recording.
 
-A short, locally generated start chime plays once the microphone is ready. Its stronger signal makes the confirmation easier to hear; perceived loudness still depends on your output volume. Existing playback stays silenced during the chime; new audio sessions are silenced as Windows reports them. It respects an already-muted output and is skipped if Windows cannot safely play it. The visual recording indicator still works when the chime is unavailable; there is no stop or processing sound.
+Handy's default marimba start sound plays once the microphone is ready. The output is prepared silently in advance to reduce startup delay; no sound plays if microphone startup fails. Perceived loudness still depends on your output volume. Existing playback stays silenced during the chime; new audio sessions are silenced as Windows reports them. It respects an already-muted output and is skipped if Windows cannot safely play it. The visual recording indicator still works when the chime is unavailable; there is no stop or processing sound.
 
 This changes Windows' output mute state. If the process is forcibly terminated or crashes while recording, Windows may remain muted; unmute it using the system volume control.
 
@@ -68,6 +70,8 @@ The phone or laptop does not run these models locally. This app connects directl
 - Responses request `store: false`; this does not override OpenAI's applicable retention or billing terms.
 
 Audio, transcripts, vocabulary, and cleanup instructions are sent to OpenAI when you use dictation. They are not sent to the repository maintainer. Audio is buffered in memory; the application does not maintain a transcript history or telemetry service. The app temporarily uses the Windows clipboard to paste, then restores it when safe. Applications, clipboard managers, and Windows clipboard history may independently observe clipboard contents.
+
+For troubleshooting, the latest safe error explanation, processing stage, exception types, and numeric error codes are saved locally to `%LOCALAPPDATA%\OpenAIDictation\last-error.json`. This single report is overwritten by the next error and contains no recording, transcript, clipboard content, API key, provider response body, or stack trace. It is never uploaded.
 
 The microphone permission, networking, global shortcut, and clipboard behavior are explained in [SECURITY.md](SECURITY.md). Implementation details and tests are in [DEVELOPMENT.md](DEVELOPMENT.md).
 

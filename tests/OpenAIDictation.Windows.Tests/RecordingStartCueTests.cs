@@ -81,6 +81,24 @@ public sealed class RecordingStartCueTests
         using var cue=new RecordingStartCue(mute,output,cancel.Token);await cue.Completion;
         Assert.False(output.Opened);Assert.True(speaker.IsMuted);
     }
+    [Fact] public async Task PreparationCannotUnmuteOrPlayUntilTheMicrophoneIsReady()
+    {
+        var speaker=new Output("speaker");using var mute=SystemAudioMute.Acquire(new Source(speaker));var output=new Cue(speaker);
+        using var prepared=new ManualResetEventSlim();output.Protected=prepared.Set;
+        using var cue=RecordingStartCue.Prepare(mute,output,CancellationToken.None);
+        Assert.True(prepared.Wait(3000));Assert.True(speaker.IsMuted);Assert.DoesNotContain("play",output.Events);
+        cue.SignalMicrophoneReady();cue.SignalMicrophoneReady();await cue.Completion;
+        Assert.Single(output.Events,e=>e=="play");Assert.Equal("played",cue.Outcome);Assert.True(speaker.IsMuted);
+    }
+    [Fact] public void CancellingPreparationAfterMicrophoneFailureNeverPlays()
+    {
+        var speaker=new Output("speaker");using var mute=SystemAudioMute.Acquire(new Source(speaker));var output=new Cue(speaker);
+        using var prepared=new ManualResetEventSlim();output.Protected=prepared.Set;
+        var cue=RecordingStartCue.Prepare(mute,output,CancellationToken.None);
+        Assert.True(prepared.Wait(3000));cue.Dispose();cue.SignalMicrophoneReady();
+        Assert.DoesNotContain("play",output.Events);Assert.Equal("cancelled",cue.Outcome);
+        Assert.True(speaker.IsMuted);Assert.False(output.OtherSessionsMuted);
+    }
     [Fact] public async Task CancellationDuringProtectionNeverUnmutesOutput()
     {
         var speaker=new Output("speaker");using var mute=SystemAudioMute.Acquire(new Source(speaker));var output=new Cue(speaker);
@@ -113,12 +131,14 @@ public sealed class RecordingStartCueTests
         Assert.True(output.OtherSessionsMuted);Assert.Equal(1,failures);
         cue.Dispose();Assert.False(output.OtherSessionsMuted);
     }
-    [Fact] public void ToneIsAudibleShortStereoAndHasClickFreeEdges()
+    [Fact] public void HandyStartSoundKeepsOriginalGainAndDuration()
     {
-        float[] tone=StartCueTone.Samples();Assert.Equal(5760*2,tone.Length);
-        Assert.Equal(0,tone[0]);Assert.Equal(0,tone[^1]);Assert.InRange(tone.Max(Math.Abs),.30f,.37f);
+        float[] tone=StartCueSound.Samples();Assert.Equal(27816*2,tone.Length);
+        Assert.InRange(Math.Abs(tone[0]),0,.0001f);Assert.InRange(Math.Abs(tone[^1]),0,.003f);
+        Assert.InRange(tone.Max(Math.Abs),.65f,.69f);
         double rms=Math.Sqrt(tone.Average(sample=>(double)sample*sample));
-        Assert.InRange(rms,.16,.20);
-        for(int i=0;i<tone.Length;i+=2)Assert.Equal(tone[i],tone[i+1]);
+        Assert.InRange(rms,.13,.15);
+        Assert.All(tone,sample=>Assert.True(float.IsFinite(sample)&&Math.Abs(sample)<1));
+        tone[100]=100;Assert.NotEqual(100,StartCueSound.Samples()[100]);
     }
 }

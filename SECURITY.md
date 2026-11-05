@@ -14,6 +14,8 @@ Recording temporarily mutes active output devices through Windows Core Audio. Th
 
 Production requests go directly to `api.openai.com` over TLS. No project server, telemetry collector, analytics SDK, or automatic update service is present. Response bodies and transcripts must not appear in error logs. Error messages should describe the failure without including credentials or private dictation.
 
+`last-error.json` stores only the latest safe error message, stage, exception type names, and HRESULT values in the current user's local application-data folder. It excludes exception messages from unexpected failures, stack traces, provider bodies, audio, clipboard content, and credentials. Failure to write this diagnostic must not interfere with cleanup or error display.
+
 OpenAI receives the audio and cleanup inputs. Its account terms and retention policies apply. `store: false` is a request option, not a claim of zero retention.
 
 ## Keyboard and clipboard
@@ -21,6 +23,8 @@ OpenAI receives the audio and cleanup inputs. Its account terms and retention po
 The app registers a global keyboard hook for Win+H, and Escape while a session is active. It must not log ordinary keystrokes. Insertion requires the original destination window to remain valid and active. The app never synthesizes an Enter key or sends messages.
 
 Paste temporarily puts cleaned text on the clipboard. The previous clipboard is restored if the app still owns the temporary value; a new clipboard value must not be overwritten. Clipboard managers and Windows history operate independently of this application.
+
+Windows can advertise an empty `EnterpriseDataProtectionId` marker that its managed clipboard API cannot read. The snapshot may omit that empty marker only when the read fails with `CLIPBRD_E_BAD_DATA` (or returns null) and Windows explicitly reports no enterprise ID. An unavailable protection check, a protected clipboard, other unreadable formats, or access-denied errors still fail closed. The app never changes enterprise protection policy or removes a meaningful label.
 
 ## Reporting
 
