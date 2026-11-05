@@ -42,7 +42,7 @@ public partial class App:System.Windows.Application
         singleInstance=new Mutex(true,"Local\\"+PipeName,out bool owner);
         if(!owner)
         {
-            try{await using var pipe=new NamedPipeClientStream(".",PipeName,PipeDirection.Out,PipeOptions.Asynchronous);await pipe.ConnectAsync(2000);await using var writer=new StreamWriter(pipe);await writer.WriteLineAsync(e.Args.FirstOrDefault()??"--settings");}catch{}
+            try{await using var pipe=new NamedPipeClientStream(".",PipeName,PipeDirection.Out,PipeOptions.Asynchronous);await pipe.ConnectAsync(2000);await using var writer=new StreamWriter(pipe){AutoFlush=true};await writer.WriteLineAsync(e.Args.FirstOrDefault()??"--settings");}catch{}
             Shutdown();return;
         }
         overlay=new OverlayWindow();overlay.StopRequested+=()=>_ = StopAsync();overlay.CancelRequested+=Cancel;
