@@ -74,7 +74,7 @@ public sealed class IndicatorTests
         var bounds=IndicatorLayout.Calculate(-2560,0,-200,1200,144,144,OverlayState.Error,150);
         Assert.Equal(750,bounds.Width);Assert.Equal(240,bounds.Height);
         Assert.Equal(-1280,bounds.Left+bounds.Width/2);
-        Assert.Equal(1188,bounds.Top+bounds.Height);
+        Assert.Equal(1170,bounds.Top+bounds.Height); // 20 DIP taskbar gap at 150% scaling.
         Assert.Equal(IndicatorAction.Cancel,IndicatorLayout.HitTest(250,149,500,OverlayState.Error,160));
         Assert.Equal(IndicatorAction.None,IndicatorLayout.HitTest(250,158,500,OverlayState.Error,160));
     }

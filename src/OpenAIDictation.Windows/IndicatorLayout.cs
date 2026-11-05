@@ -5,7 +5,7 @@ internal readonly record struct IndicatorBounds(int Left,int Top,int Width,int H
 /// <summary>Positions the visible indicator using physical monitor/work-area coordinates.</summary>
 internal static class IndicatorLayout
 {
-    internal const double WindowWidth=320,WindowHeight=60,TaskbarGap=8;
+    internal const double WindowWidth=320,WindowHeight=60,TaskbarGap=20;
     internal const double PillWidth=300,PillHeight=50,PillTop=5,CancelTargetWidth=54;
     internal const double ErrorWidth=480,ErrorMinimumHeight=110;
 
