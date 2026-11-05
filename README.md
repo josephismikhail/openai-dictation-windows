@@ -13,6 +13,8 @@ This is an independent project, inspired by Handy's minimal recording interface.
 
 Use the indicator's cancel control or **Escape** during a recording to cancel. The tray menu opens settings or exits the app. The microphone opens only during a recording; there is no always-listening mode.
 
+Recordings stop automatically at ten minutes. If cleanup or insertion fails after a transcript is available, choose **Recover last text** in the tray menu to copy it. Recovery is held only in memory and disappears when the app exits or a later dictation succeeds.
+
 Cleanup removes filler words, applies explicit spoken corrections, and formats punctuation and lists. Add preferred names and spellings in settings. Like any speech model, it can make mistakes: review text before sending it. Dictation does not press Send or submit forms.
 
 ## Requirements
@@ -42,6 +44,10 @@ Open **Settings** from the tray menu, enter your own API key, and save it. Keys 
 
 The recording indicator is a small rounded pill with a live waveform, a status dot, and a cancel button. Processing uses a spinner. It is positioned near the bottom of the active monitor and does not take keyboard focus from your editor. The app is native WPF; it does not embed a browser or download a local language model.
 
+![Recording indicator](docs/images/recording.png)
+
+![Processing indicator](docs/images/processing.png)
+
 ## OpenAI processing and privacy
 
 The phone or laptop does not run these models locally. This app connects directly to OpenAI, without a project-operated proxy or account service:
@@ -60,6 +66,7 @@ The microphone permission, networking, global shortcut, and clipboard behavior a
 - This app replaces Windows' normal Win+H behavior while it is running. Exit it to release the shortcut.
 - Text insertion depends on the destination accepting a standard paste. Elevated apps, games, protected fields, remote desktops, and custom editors may restrict automation.
 - It verifies the destination before pasting; if you switch apps, it should refuse to paste into a different window.
+- Clipboard contents are copied before pasting. If a format cannot be safely preserved, the app leaves the clipboard alone and makes the result available through **Recover last text**.
 - The cleanup model can change meaning or miss names despite instructions. Vocabulary hints improve recognition but cannot guarantee perfect spelling.
 - Availability, latency, and charges depend on the API models and your account. Ultrafast is a requested service tier, not an application-level speed guarantee.
 

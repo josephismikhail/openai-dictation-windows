@@ -5,6 +5,7 @@
 - `src/OpenAIDictation.Core`: API transport, transcription session protocol, cleanup and pure helpers.
 - `src/OpenAIDictation.Windows`: WPF indicator/settings, global hotkey, microphone capture, credential storage and insertion.
 - `tests/OpenAIDictation.Tests`: synthetic protocol and behavior tests.
+- `tests/OpenAIDictation.Windows.Tests`: Windows clipboard snapshot and audio-boundary tests; these do not access the real clipboard or microphone.
 - `scripts`: build/install and local lifecycle helpers.
 
 The application uses the Windows SDK interfaces exposed by .NET and direct OpenAI HTTPS/WebSocket APIs. It does not depend on a browser runtime or a local model server.
