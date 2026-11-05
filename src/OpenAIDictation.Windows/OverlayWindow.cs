@@ -95,6 +95,9 @@ internal sealed class OverlayWindow:Window
             ToolTip=state==OverlayState.Error?Message:null;
             AutomationProperties.SetName(this,state==OverlayState.Error?"Dictation error. "+Message:state==OverlayState.Recording?"Listening. Click anywhere to finish dictation. Escape cancels.":"Processing dictation. Escape cancels.");
             AutomationProperties.SetLiveSetting(this,state==OverlayState.Error?AutomationLiveSetting.Assertive:AutomationLiveSetting.Polite);
+            // Invalidate before Present's UpdateLayout, so a reused hidden window
+            // rebuilds its drawing instead of revealing the previous processing frame.
+            InvalidateVisual();
         }
         private static Brush Solid(Color color){var brush=new SolidColorBrush(color);brush.Freeze();return brush;}
         private static Pen FrozenPen(Brush brush,double width){var pen=new Pen(brush,width);pen.Freeze();return pen;}

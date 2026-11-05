@@ -28,6 +28,17 @@ public sealed class PixelVoiceAnimationTests
                 var size=overlay.RenderSize;Assert.True(size.Width>0 && size.Height>0);
                 overlay.Present(OverlayState.Processing,target);
                 Assert.Equal(1,overlay.Opacity);Assert.Equal(size,overlay.RenderSize);
+                var indicator=(OverlayWindow.Indicator)overlay.Content;
+                indicator.Signal.BeginProcessing(0);indicator.InvalidateVisual();overlay.UpdateLayout();
+                Assert.Contains(System.Windows.Media.VisualTreeHelper.GetDrawing(indicator).Children,
+                    drawing=>drawing is System.Windows.Media.GeometryDrawing {Geometry:System.Windows.Media.StreamGeometry});
+                overlay.Hide();
+                overlay.Present(OverlayState.Recording,target);
+                Assert.Equal(0,overlay.Opacity);
+                // Inspect the retained drawing before the reveal callback runs.
+                // Resetting signal data alone must not leave the old shape cached.
+                Assert.DoesNotContain(System.Windows.Media.VisualTreeHelper.GetDrawing(indicator).Children,
+                    drawing=>drawing is System.Windows.Media.GeometryDrawing {Geometry:System.Windows.Media.StreamGeometry});
             }
             catch(Exception caught){error=caught;}
             finally{overlay?.Close();}
