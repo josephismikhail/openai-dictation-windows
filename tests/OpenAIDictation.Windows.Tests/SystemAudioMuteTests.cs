@@ -57,6 +57,14 @@ public sealed class SystemAudioMuteTests
         Assert.Equal(new[]{true,false},first.Changes);Assert.Equal(new[]{true,false},failed.Changes);
         Assert.Equal(1,untouched.Disposals);
     }
+    [Fact] public void AcquisitionKeepsTheNativeCauseWithoutChangingUserFacingError()
+    {
+        var failed=new Device("failed"){FailMute=true};
+        var error=Assert.Throws<InvalidOperationException>(()=>SystemAudioMute.Acquire(new Source(failed)));
+        Assert.Equal("Windows could not mute audio for recording. Please try again.",error.Message);
+        Assert.IsType<InvalidOperationException>(error.InnerException);
+        Assert.False(failed.Muted);
+    }
     [Fact] public void UnpluggedDeviceDoesNotPreventOtherOutputsFromRestoring()
     {
         var unplugged=new Device("unplugged");var normal=new Device("normal");var lease=SystemAudioMute.Acquire(new Source(unplugged,normal));
