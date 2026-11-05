@@ -77,7 +77,16 @@ internal static class TextInserter
         {
             for(int attempt=0;;attempt++)
             {
-                try{old=System.Windows.Clipboard.GetDataObject();System.Windows.Clipboard.SetText(text);changed=true;ownSequence=NativeMethods.GetClipboardSequenceNumber();break;}
+                try
+                {
+                    uint before=NativeMethods.GetClipboardSequenceNumber();
+                    old=ClipboardSnapshot.Capture(System.Windows.Clipboard.GetDataObject());
+                    if(before!=NativeMethods.GetClipboardSequenceNumber())
+                        throw new COMException("Clipboard changed while copying.");
+                    ct.ThrowIfCancellationRequested();
+                    if(!target.IsCurrent())throw new InvalidOperationException("The text field changed. Dictation was not inserted.");
+                    System.Windows.Clipboard.SetText(text);changed=true;ownSequence=NativeMethods.GetClipboardSequenceNumber();break;
+                }
                 catch(System.Runtime.InteropServices.COMException) when(attempt<4){await Task.Delay(50,ct);}
             }
             ct.ThrowIfCancellationRequested();

@@ -33,6 +33,7 @@ public partial class App:System.Windows.Application
         internal bool Processing;
         internal volatile bool LiveFailed;
         internal int Disposed;
+        internal int LimitSignaled;
     }
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -97,7 +98,18 @@ public partial class App:System.Windows.Application
             },session.Cancel.Token);
             session.Recorder=new PcmRecorder();
             session.Recorder.Error+=message=>Dispatcher.BeginInvoke(()=>Fail(session,message));
-            session.Recorder.Data+=data=>{session.Recorded.Write(data);if(!session.Audio.Writer.TryWrite(data)){session.Cancel.Cancel();Dispatcher.BeginInvoke(()=>Fail(session,"Audio could not be sent fast enough. Please try again."));}};
+            session.Recorder.Data+=data=>
+            {
+                int accepted=PcmLimit.AcceptedBytes(session.Recorded.Length,data.Length);
+                if(accepted>0)
+                {
+                    if(accepted!=data.Length)Array.Resize(ref data,accepted);
+                    session.Recorded.Write(data);
+                    if(!session.Audio.Writer.TryWrite(data)){session.Cancel.Cancel();Dispatcher.BeginInvoke(()=>Fail(session,"Audio could not be sent fast enough. Please try again."));}
+                }
+                if(session.Recorded.Length>=WaveFile.MaxPcmBytes && Interlocked.Exchange(ref session.LimitSignaled,1)==0)
+                    Dispatcher.BeginInvoke(()=>{if(current==session && !session.Processing)_=StopAsync();});
+            };
             session.Recorder.Level+=level=>Dispatcher.BeginInvoke(()=>{if(current==session)overlay?.SetLevel(level);});
             session.Recorder.Start();overlay!.Present(OverlayState.Recording,session.Target);_=ObserveConnection(session);_=LimitRecording(session);
         }
