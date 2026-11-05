@@ -240,7 +240,7 @@ internal static class StartCueTone
         for(int frame=0;frame<frames;frame++)
         {
             double t=frame/48000.0,fade=Math.Min(1,Math.Min(frame/480.0,(frames-1-frame)/960.0));
-            float value=(float)(.085*fade*(Math.Sin(2*Math.PI*660*t)+.45*Math.Sin(2*Math.PI*990*t)));
+            float value=(float)(.255*fade*(Math.Sin(2*Math.PI*660*t)+.45*Math.Sin(2*Math.PI*990*t)));
             samples[2*frame]=samples[2*frame+1]=value;
         }
         return samples;

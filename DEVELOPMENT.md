@@ -26,6 +26,8 @@ Before shipping, check Win+H start/stop in Notepad, silence, Escape cancellation
 
 `RecordingStartCue` starts only after `PcmRecorder.Start()` succeeds. It plays a generated 120 ms stereo tone with short fades, never a downloaded sound file. It runs on an MTA worker so Core Audio can deliver new-session notifications, and does not delay the keyboard shortcut dispatcher.
 
+The tone uses a 0.255 gain for its two sine components, three times the initial 0.085 gain (about +9.5 dB). Synthetic checks constrain both peak and RMS amplitude and verify stereo channels and silent edges. This does not change Windows volume levels, device selection, or mute ownership.
+
 The normal recording lease still mutes every active render endpoint. During the chime only, `CoreAudioCuePlatform` opens the current default output explicitly using WASAPI shared mode, mutes other processes' sessions on that endpoint, and subscribes before enumerating sessions. Only then may `SystemAudioMute` temporarily release its own mute on that one endpoint. Outputs that were already muted are never released. A device change cannot reroute the tone because the renderer retains the selected endpoint.
 
 Cleanup re-mutes the endpoint before restoring session mute states. Stop/cancel drains the recorder, cancels and joins the cue, then restores endpoint states. If a driver refuses the re-mute, session protection stays held until capture is closed and the recording is failed safely. Ordinary cue setup/playback failures skip feedback without disabling dictation. Neither session nor endpoint volume levels are changed.
