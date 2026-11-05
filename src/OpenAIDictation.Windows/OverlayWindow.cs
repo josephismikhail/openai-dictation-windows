@@ -14,17 +14,21 @@ internal sealed class OverlayWindow:Window
     private readonly Indicator indicator=new();
     private readonly DispatcherTimer timer;
     private FullscreenOverlayBounds? selectedMonitor;
+    private int presentationGeneration;
     public event Action? StopRequested;
     public event Action? CancelRequested;
     public OverlayWindow()
     {
         Title="OpenAI Dictation";
-        WindowStyle=WindowStyle.None;ResizeMode=ResizeMode.NoResize;AllowsTransparency=true;
+        WindowStyle=WindowStyle.None;ResizeMode=ResizeMode.NoResize;AllowsTransparency=true;WindowStartupLocation=WindowStartupLocation.Manual;
         Background=Brushes.Transparent;Topmost=true;ShowActivated=false;ShowInTaskbar=false;Focusable=false;Content=indicator;
         SourceInitialized+=(_,_)=>
         {
             nint handle=new WindowInteropHelper(this).Handle;
             var source=HwndSource.FromHwnd(handle);
+            // Do not let the compositor animate this window from its previous bounds.
+            int disableTransitions=1;
+            NativeMethods.DwmSetWindowAttribute(handle,3,ref disableTransitions,sizeof(int));
             NativeMethods.SetWindowLongPtr(handle,-20,NativeMethods.GetWindowLongPtr(handle,-20)|0x08000000|0x80);
             source?.AddHook((nint hwnd,int message,nint wp,nint lp,ref bool handled)=>
             {
@@ -40,10 +44,11 @@ internal sealed class OverlayWindow:Window
         };
         timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(16)};
         timer.Tick+=(_,_)=>{if(SystemParameters.ClientAreaAnimation)indicator.InvalidateVisual();};
-        IsVisibleChanged+=(_,_)=>{if(IsVisible)timer.Start();else timer.Stop();};
+        IsVisibleChanged+=(_,_)=>{if(IsVisible)timer.Start();else{timer.Stop();presentationGeneration++;}};
     }
     public void Present(OverlayState state,nint target,string? message=null)
     {
+        var previousMonitor=selectedMonitor;
         // Freeze the recording monitor across processing, even if the editor moves.
         if(state!=OverlayState.Processing || selectedMonitor==null)
         {
@@ -54,10 +59,23 @@ internal sealed class OverlayWindow:Window
             selectedMonitor=FullscreenOverlayLayout.Calculate(info.Monitor.Left,info.Monitor.Top,info.Monitor.Right,info.Monitor.Bottom,dpiX==0?96:dpiX,dpiY==0?96:dpiY);
         }
         var bounds=selectedMonitor.Value;
+        if(IsVisible && previousMonitor!=selectedMonitor)Hide();
         indicator.SetState(state,message);
-        Width=bounds.LogicalWidth;Height=bounds.LogicalHeight;
-        nint handle=new WindowInteropHelper(this).EnsureHandle();
-        Place(handle,bounds);Show();Place(handle,bounds);indicator.InvalidateVisual();
+        if(!IsVisible)
+        {
+            // WPF can apply its remembered placement again during Show. Keep that
+            // first sizing/render pass transparent, then reveal the completed surface.
+            int generation=++presentationGeneration;
+            Opacity=0;
+            Width=bounds.LogicalWidth;Height=bounds.LogicalHeight;
+            nint handle=new WindowInteropHelper(this).EnsureHandle();
+            Place(handle,bounds);Show();Place(handle,bounds);UpdateLayout();
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded,()=>
+            {
+                if(IsVisible && generation==presentationGeneration)Opacity=1;
+            });
+        }
+        indicator.InvalidateVisual();
     }
     private static void Place(nint handle,FullscreenOverlayBounds bounds)=>NativeMethods.SetWindowPos(handle,-1,bounds.Left,bounds.Top,bounds.Width,bounds.Height,0x0010);
     public void SetLevel(float value){indicator.Signal.Observe(value,Now());indicator.InvalidateVisual();}

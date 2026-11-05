@@ -13,6 +13,7 @@ internal static class NativeMethods
     [DllImport("user32.dll", CharSet=CharSet.Auto)] internal static extern bool GetMonitorInfo(nint monitor, ref MonitorInfo info);
     [DllImport("shcore.dll")] internal static extern int GetDpiForMonitor(nint monitor,int type,out uint x,out uint y);
     [DllImport("user32.dll")] internal static extern bool SetWindowPos(nint window,nint after,int x,int y,int width,int height,uint flags);
+    [DllImport("dwmapi.dll")] internal static extern int DwmSetWindowAttribute(nint window,int attribute,ref int value,int size);
     [DllImport("user32.dll", SetLastError=true)] internal static extern uint SendInput(uint count, Input[] inputs, int size);
     [DllImport("user32.dll")] internal static extern uint GetClipboardSequenceNumber();
     [DllImport("user32.dll", EntryPoint="GetWindowLongPtrW")] internal static extern nint GetWindowLongPtr(nint hwnd,int index);

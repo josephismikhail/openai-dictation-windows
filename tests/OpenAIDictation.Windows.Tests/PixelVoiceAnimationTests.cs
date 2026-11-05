@@ -4,6 +4,37 @@ namespace OpenAIDictation.Windows.Tests;
 
 public sealed class PixelVoiceAnimationTests
 {
+    [Fact] public void FullscreenRevealWaitsForLayoutAndCanceledRevealStaysHidden()
+    {
+        Exception? error=null;
+        var thread=new Thread(()=>
+        {
+            OverlayWindow? overlay=null;
+            try
+            {
+                overlay=new OverlayWindow();
+                nint target=NativeMethods.GetForegroundWindow();
+                overlay.Present(OverlayState.Recording,target);
+                Assert.Equal(0,overlay.Opacity);
+                overlay.Hide();
+                System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(
+                    System.Windows.Threading.DispatcherPriority.ApplicationIdle,new Action(()=>{}));
+                Assert.False(overlay.IsVisible);Assert.Equal(0,overlay.Opacity);
+                overlay.Present(OverlayState.Recording,target);
+                Assert.Equal(0,overlay.Opacity);
+                System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(
+                    System.Windows.Threading.DispatcherPriority.ApplicationIdle,new Action(()=>{}));
+                Assert.Equal(1,overlay.Opacity);
+                var size=overlay.RenderSize;Assert.True(size.Width>0 && size.Height>0);
+                overlay.Present(OverlayState.Processing,target);
+                Assert.Equal(1,overlay.Opacity);Assert.Equal(size,overlay.RenderSize);
+            }
+            catch(Exception caught){error=caught;}
+            finally{overlay?.Close();}
+        });
+        thread.SetApartmentState(ApartmentState.STA);thread.Start();thread.Join();
+        if(error!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(error).Throw();
+    }
     [Theory]
     [InlineData(0,0,1920,1080,96,96,1920,1080)]
     [InlineData(-2560,-200,0,1240,144,144,2560/1.5,960)]
