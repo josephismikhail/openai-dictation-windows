@@ -91,6 +91,7 @@ public partial class App:System.Windows.Application
         {
             string key=LocalStore.LoadKey();var options=LocalStore.LoadOptions();
             var focus=FocusSnapshot.Capture();
+            overlay?.Hide();
             started=new Session{Target=focus.Window,Focus=focus,Key=key,Options=options,Live=client.CreateSession(key,options)};current=started;
             var session=started;
             session.AudioMute=SystemAudioMute.Acquire();
@@ -125,10 +126,18 @@ public partial class App:System.Windows.Application
             };
             session.Recorder.Level+=level=>Dispatcher.BeginInvoke(()=>{if(current==session)overlay?.SetLevel(level);});
             session.Recorder.Start();session.StartCue.SignalMicrophoneReady();
-            session.Stage=DictationStage.Recording;overlay!.Present(OverlayState.Recording,session.Target);
+            session.Stage=DictationStage.Recording;_=ShowRecordingWhenReady(session,session.StartCue);
             _=ObserveConnection(session);_=LimitRecording(session);
         }
         catch(Exception ex){if(started!=null)Fail(started,DictationFailure.Describe(ex,started.Stage),ex);else{var message=DictationFailure.Describe(ex,DictationStage.Initialization);DictationFailure.Save(DictationStage.Initialization,message,ex);ShowError(message);ShowSettings();}}
+    }
+    private async Task ShowRecordingWhenReady(Session session,RecordingStartCue cue)
+    {
+        await cue.PresentationReady;
+        if(current!=session || session.Processing || session.Cancel.IsCancellationRequested
+            || lifetime.IsCancellationRequested || Dispatcher.HasShutdownStarted)return;
+        try{overlay!.Present(OverlayState.Recording,session.Target);}
+        catch(Exception error){Fail(session,DictationFailure.Describe(error,session.Stage),error);}
     }
     private async Task ObserveConnection(Session session)
     {

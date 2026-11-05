@@ -6,9 +6,12 @@ internal sealed class RecordingStartCue : IDisposable
     private readonly CancellationTokenSource cancel;
     private readonly ManualResetEventSlim microphoneReady;
     private readonly Task worker;
+    private readonly TaskCompletionSource presentationReady=new(TaskCreationOptions.RunContinuationsAsynchronously);
     private IDisposable? deferredGuard;
     private int disposed;
     internal Task Completion=>worker;
+    /// <summary>Audio is queued, or optional audio is unavailable; the recording UI may now appear.</summary>
+    internal Task PresentationReady=>presentationReady.Task;
     internal string Outcome{get;private set;}="pending";
     internal int FailureCode{get;private set;}
     internal string Stage{get;private set;}="queued";
@@ -54,13 +57,15 @@ internal sealed class RecordingStartCue : IDisposable
             microphoneReady.Wait(cancel.Token);
             Stage="permitting-output";
             permit=mute.PermitCue(output.Id);
-            if(permit!=null){Stage="playing";output.Play(cancel.Token);Outcome="played";}
+            if(permit!=null){Stage="playing";output.Play(cancel.Token,()=>presentationReady.TrySetResult());Outcome="played";}
             else Outcome="muted-or-unavailable";
         }
         catch(OperationCanceledException){Outcome="cancelled";}
         catch(Exception error){Outcome="unavailable";FailureCode=error.HResult; /* Feedback is optional; dictation remains usable without a sound. */ }
         finally
         {
+            // Muted, failed, or canceled audio must never leave presentation waiting.
+            presentationReady.TrySetResult();
             try{mute.CloseCue();}
             catch
             {
@@ -87,5 +92,5 @@ internal interface IRecordingCueOutput : IDisposable
 {
     string Id {get;}
     IDisposable ProtectOtherSessions(Action failed);
-    void Play(CancellationToken token);
+    void Play(CancellationToken token,Action playbackQueued);
 }
