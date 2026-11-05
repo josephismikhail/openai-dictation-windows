@@ -113,10 +113,12 @@ public sealed class RecordingStartCueTests
         Assert.True(output.OtherSessionsMuted);Assert.Equal(1,failures);
         cue.Dispose();Assert.False(output.OtherSessionsMuted);
     }
-    [Fact] public void ToneIsShortStereoQuietAndHasClickFreeEdges()
+    [Fact] public void ToneIsAudibleShortStereoAndHasClickFreeEdges()
     {
         float[] tone=StartCueTone.Samples();Assert.Equal(5760*2,tone.Length);
-        Assert.Equal(0,tone[0]);Assert.Equal(0,tone[^1]);Assert.InRange(tone.Max(Math.Abs),.05f,.14f);
+        Assert.Equal(0,tone[0]);Assert.Equal(0,tone[^1]);Assert.InRange(tone.Max(Math.Abs),.30f,.37f);
+        double rms=Math.Sqrt(tone.Average(sample=>(double)sample*sample));
+        Assert.InRange(rms,.16,.20);
         for(int i=0;i<tone.Length;i+=2)Assert.Equal(tone[i],tone[i+1]);
     }
 }

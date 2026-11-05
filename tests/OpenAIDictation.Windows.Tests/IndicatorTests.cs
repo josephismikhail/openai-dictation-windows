@@ -38,8 +38,36 @@ public sealed class IndicatorTests
     {
         var signal=new VoiceSignal();signal.Observe(.12f);
         for(int i=0;i<6;i++)signal.Advance(1d/60);
-        Assert.InRange(signal.Height(4),24,VoiceSignal.PeakHeight);
+        Assert.InRange(signal.Height(4),47,VoiceSignal.PeakHeight);
         Assert.True(signal.Height(4)>signal.Height(0)*1.7);
+        for(int i=0;i<12;i++)signal.Advance(1d/60);
+        Assert.InRange(signal.Height(4),53,VoiceSignal.PeakHeight);
+    }
+    [Fact] public void QuietSpeechStillProducesAnObviousSignal()
+    {
+        var signal=new VoiceSignal();signal.Observe(.03f);
+        for(int i=0;i<6;i++)signal.Advance(1d/60);
+        Assert.InRange(signal.Height(4),40,VoiceSignal.PeakHeight);
+        Assert.True(signal.Height(4)>VoiceSignal.QuietHeight*15);
+    }
+    [Fact] public void LargerPillContainsMaximumSignalWithoutClipping()
+    {
+        Assert.True(IndicatorLayout.WindowWidth>=IndicatorLayout.PillWidth);
+        Assert.True(IndicatorLayout.WindowHeight>=IndicatorLayout.PillTop+IndicatorLayout.PillHeight);
+        Assert.True(IndicatorLayout.PillHeight-VoiceSignal.PeakHeight>=12);
+    }
+    [Theory]
+    [InlineData(160,39,(int)OverlayState.Recording,(int)IndicatorAction.Stop)]
+    [InlineData(283,39,(int)OverlayState.Recording,(int)IndicatorAction.Cancel)]
+    [InlineData(257,39,(int)OverlayState.Recording,(int)IndicatorAction.Cancel)]
+    [InlineData(160,39,(int)OverlayState.Processing,(int)IndicatorAction.Cancel)]
+    [InlineData(160,39,(int)OverlayState.Error,(int)IndicatorAction.Cancel)]
+    [InlineData(5,39,(int)OverlayState.Recording,(int)IndicatorAction.None)]
+    [InlineData(160,2,(int)OverlayState.Recording,(int)IndicatorAction.None)]
+    [InlineData(160,76,(int)OverlayState.Recording,(int)IndicatorAction.None)]
+    public void VisiblePillHasCorrectStopAndCancelTargets(double x,double y,int state,int expected)
+    {
+        Assert.Equal((IndicatorAction)expected,IndicatorLayout.HitTest(x,y,IndicatorLayout.WindowWidth,(OverlayState)state));
     }
     [Fact] public void PausingSmoothlyReturnsToTheQuietLine()
     {

@@ -44,7 +44,7 @@ Open **Settings** from the tray menu, enter your own API key, and save it. Keys 
 
 ## Interface
 
-The recording indicator is a small rounded pill with a voice-driven waveform, a status dot, and a cancel button. Speech produces large peaks; silence settles to a flat line. Processing uses a spinner. The pill is centered horizontally on the active monitor and sits just above its taskbar, with DPI-aware positioning. It does not take keyboard focus from your editor. The app is native WPF; it does not embed a browser or download a local language model.
+The recording indicator is a black rounded pill with a white voice-driven waveform, status light, and cancel button. The 300 × 68 DIP surface gives quiet speech a pronounced response, with peaks up to 56 DIP; silence settles to a flat line. Processing uses a white spinner. Click the recording surface to finish, or its right-hand × to cancel. The pill is centered horizontally on the active monitor and sits just above its taskbar, with DPI-aware positioning. It does not take keyboard focus from your editor. The app is native WPF; it does not embed a browser or download a local language model.
 
 ![Recording indicator](docs/images/recording.png)
 
@@ -54,7 +54,7 @@ The recording indicator is a small rounded pill with a voice-driven waveform, a 
 
 Starting dictation temporarily mutes every active Windows audio output, including playback from browsers, Spotify, and other apps. It preserves devices that were already muted and does not change volume levels. Audio returns after microphone capture stops, before transcription and cleanup finish. Canceling or normally exiting also restores the previous state. Newly active outputs are checked while recording.
 
-A quiet, locally generated start chime plays once the microphone is ready. Existing playback stays silenced during the chime; new audio sessions are silenced as Windows reports them. It respects an already-muted output and is skipped if Windows cannot safely play it. The visual recording indicator still works when the chime is unavailable; there is no stop or processing sound.
+A short, locally generated start chime plays once the microphone is ready. Its stronger signal makes the confirmation easier to hear; perceived loudness still depends on your output volume. Existing playback stays silenced during the chime; new audio sessions are silenced as Windows reports them. It respects an already-muted output and is skipped if Windows cannot safely play it. The visual recording indicator still works when the chime is unavailable; there is no stop or processing sound.
 
 This changes Windows' output mute state. If the process is forcibly terminated or crashes while recording, Windows may remain muted; unmute it using the system volume control.
 

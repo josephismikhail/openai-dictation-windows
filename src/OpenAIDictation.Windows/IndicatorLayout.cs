@@ -5,7 +5,16 @@ internal readonly record struct IndicatorBounds(int Left,int Top,int Width,int H
 /// <summary>Positions the visible indicator using physical monitor/work-area coordinates.</summary>
 internal static class IndicatorLayout
 {
-    internal const double WindowWidth=266,WindowHeight=50,TaskbarGap=8;
+    internal const double WindowWidth=320,WindowHeight=78,TaskbarGap=8;
+    internal const double PillWidth=300,PillHeight=68,PillTop=5,CancelTargetWidth=54;
+
+    internal static IndicatorAction HitTest(double x,double y,double windowWidth,OverlayState state)
+    {
+        double left=(windowWidth-PillWidth)/2;
+        if(x<left || x>left+PillWidth || y<PillTop || y>PillTop+PillHeight)return IndicatorAction.None;
+        return state!=OverlayState.Recording || x>=left+PillWidth-CancelTargetWidth
+            ?IndicatorAction.Cancel:IndicatorAction.Stop;
+    }
 
     internal static IndicatorBounds Calculate(int monitorLeft,int monitorRight,int workTop,int workBottom,uint dpiX,uint dpiY)
     {
@@ -18,3 +27,5 @@ internal static class IndicatorLayout
         return new(left,top,width,height);
     }
 }
+
+internal enum IndicatorAction { None,Stop,Cancel }
