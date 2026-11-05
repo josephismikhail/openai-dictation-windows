@@ -161,6 +161,11 @@ public partial class App:System.Windows.Application
             recovery=cleaned.Text;
             if(current!=session || session.Cancel.IsCancellationRequested)return;
             session.Stage=DictationStage.Insertion;
+            // Remove the full-screen UI before checking the editor's final focus.
+            // Do not activate a destination: a real app switch must still reject insertion.
+            overlay.Hide();
+            await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Input);
+            if(current!=session || session.Cancel.IsCancellationRequested)return;
             await TextInserter.InsertAsync(session.Focus,cleaned.Text,session.Cancel.Token);
             if(current==session){current=null;recoveryText="";overlay.Hide();}
         }

@@ -23,10 +23,10 @@ internal sealed class OverlayWindow:Window
         Background=Brushes.Transparent;Topmost=true;ShowActivated=false;ShowInTaskbar=false;Focusable=false;Content=indicator;
         SourceInitialized+=(_,_)=>
         {
-            var source=(HwndSource)PresentationSource.FromVisual(this);
-            nint handle=source.Handle;
+            nint handle=new WindowInteropHelper(this).Handle;
+            var source=HwndSource.FromHwnd(handle);
             NativeMethods.SetWindowLongPtr(handle,-20,NativeMethods.GetWindowLongPtr(handle,-20)|0x08000000|0x80);
-            source.AddHook((nint hwnd,int message,nint wp,nint lp,ref bool handled)=>
+            source?.AddHook((nint hwnd,int message,nint wp,nint lp,ref bool handled)=>
             {
                 // Clicking must preserve the original editor's focus and selection.
                 if(message==0x21){handled=true;return 3;} // WM_MOUSEACTIVATE: MA_NOACTIVATE
