@@ -25,3 +25,6 @@ public sealed record CleanupResult(string Text, int InputTokens, int OutputToken
 
 /// <summary>A safe, user-facing failure. Provider bodies and credentials are never included.</summary>
 public sealed class DictationException(string message) : Exception(message);
+
+/// <summary>A completed recording with no recognized speech; the UI dismisses silently.</summary>
+public sealed class NoSpeechDetectedException() : Exception("No speech was detected.");

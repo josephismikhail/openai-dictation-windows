@@ -185,7 +185,7 @@ public sealed class RealtimeSession : IAsyncDisposable
 
     private void Finish(string text)
     {
-        if (text.Length == 0) Fail(new DictationException("No speech was detected."));
+        if (text.Length == 0) Fail(new NoSpeechDetectedException());
         else _final.TrySetResult(text);
     }
     private void Fail(Exception error)

@@ -105,6 +105,20 @@ public class FallbackChunkTests
         Assert.Equal("second part", await client.TranscribeAsync(new byte[WaveFile.MaxUploadFileBytes + 2], "test", new()));
         Assert.Equal(2, calls);
     }
+    [Theory] [InlineData("")] [InlineData("   ")]
+    public async Task SilentRecordingHasDistinctDismissalOutcome(string silence)
+    {
+        int calls=0;
+        using var client=new OpenAiClient(new HttpClient(new CoreTests.StubHandler((_,_)=>
+        {
+            calls++;
+            return Task.FromResult(CoreTests.Json(System.Text.Json.JsonSerializer.Serialize(new{text=silence})));
+        })));
+        await Assert.ThrowsAsync<NoSpeechDetectedException>(()=>client.TranscribeAsync(new byte[2],"test",new()));
+        Assert.Equal(1,calls);
+        await Assert.ThrowsAsync<NoSpeechDetectedException>(()=>client.CleanupAsync(silence,"test",new()));
+        Assert.Equal(1,calls);
+    }
     private sealed class CancelOnDisposeContent(string value, CancellationTokenSource source) : StringContent(value, Encoding.UTF8, "application/json")
     {
         protected override void Dispose(bool disposing) { if (disposing) source.Cancel(); base.Dispose(disposing); }

@@ -152,9 +152,10 @@ public partial class App:System.Windows.Application
             session.Stage=DictationStage.Transcription;
             string raw="";
             try{await session.Connection;if(!session.LiveFailed)raw=await session.Live.CompleteAsync(session.Cancel.Token);}
+            catch(NoSpeechDetectedException){throw;}
             catch when(!session.Cancel.IsCancellationRequested){session.LiveFailed=true;}
             if(session.LiveFailed || string.IsNullOrWhiteSpace(raw))raw=await client.TranscribeAsync(session.Recorded.ToArray(),session.Key,session.Options,session.Cancel.Token);
-            if(string.IsNullOrWhiteSpace(raw))throw new InvalidOperationException("No speech was detected.");
+            if(string.IsNullOrWhiteSpace(raw))throw new NoSpeechDetectedException();
             recovery=raw;
             session.Stage=DictationStage.Cleanup;
             var cleaned=await client.CleanupAsync(raw,session.Key,session.Options,session.Cancel.Token);
@@ -169,6 +170,7 @@ public partial class App:System.Windows.Application
             await TextInserter.InsertAsync(session.Focus,cleaned.Text,session.Cancel.Token);
             if(current==session){current=null;recoveryText="";overlay.Hide();}
         }
+        catch(NoSpeechDetectedException){if(current==session)Cancel();}
         catch(OperationCanceledException){}catch(Exception ex){if(current==session && recovery.Length>0)recoveryText=recovery;Fail(session,DictationFailure.Describe(ex,session.Stage)+(recovery.Length>0?" Use the tray's Recover last text menu to copy the transcript.":""),ex);}
         finally{await DisposeSession(session);}
     }
