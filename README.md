@@ -1,4 +1,4 @@
-# OpenAI Dictation for Windows
+# Windows OpenAI Dictation
 
 A small native Windows app for **Win+H dictation with OpenAI transcription and cleanup**. It shows a compact indicator near the bottom of the active monitor while you speak, then pastes the cleaned text into the app you started from.
 
