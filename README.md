@@ -17,6 +17,8 @@ Recordings stop automatically at ten minutes. If cleanup or insertion fails afte
 
 Cleanup removes filler words, applies explicit spoken corrections, and formats punctuation and lists. Add preferred names and spellings in settings. Like any speech model, it can make mistakes: review text before sending it. Dictation does not press Send or submit forms.
 
+Configured vocabulary preserves its exact capitalization after cleanup. Personal spelling preferences are stored in local settings and are not built into the public source.
+
 ## Requirements
 
 - Windows 10 or Windows 11, x64.
@@ -42,11 +44,17 @@ Open **Settings** from the tray menu, enter your own API key, and save it. Keys 
 
 ## Interface
 
-The recording indicator is a small rounded pill with a live waveform, a status dot, and a cancel button. Processing uses a spinner. It is positioned near the bottom of the active monitor and does not take keyboard focus from your editor. The app is native WPF; it does not embed a browser or download a local language model.
+The recording indicator is a small rounded pill with a voice-driven waveform, a status dot, and a cancel button. Speech produces large peaks; silence settles to a flat line. Processing uses a spinner. The pill is centered horizontally on the active monitor and sits just above its taskbar, with DPI-aware positioning. It does not take keyboard focus from your editor. The app is native WPF; it does not embed a browser or download a local language model.
 
 ![Recording indicator](docs/images/recording.png)
 
 ![Processing indicator](docs/images/processing.png)
+
+## Audio while recording
+
+Starting dictation temporarily mutes every active Windows audio output, including playback from browsers, Spotify, and other apps. It preserves devices that were already muted and does not change volume levels. Audio returns after microphone capture stops, before transcription and cleanup finish. Canceling or normally exiting also restores the previous state. Newly active outputs are checked while recording.
+
+This changes Windows' output mute state. If the process is forcibly terminated or crashes while recording, Windows may remain muted; unmute it using the system volume control.
 
 ## OpenAI processing and privacy
 
