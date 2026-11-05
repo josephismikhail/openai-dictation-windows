@@ -11,7 +11,14 @@ $base = Join-Path $env:LOCALAPPDATA 'OpenAIDictation'
 $app = Join-Path $base 'app'
 $startup = [Environment]::GetFolderPath('Startup')
 $exe = Join-Path $app 'OpenAIDictation.exe'
-Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq $exe } | ForEach-Object { Stop-Process -Id $_.ProcessId -ErrorAction SilentlyContinue }
+$running = @(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq $exe })
+if ($running.Count -gt 0) {
+    Start-Process -FilePath $exe -ArgumentList '--quit' -WindowStyle Hidden -Wait
+    foreach ($item in $running) {
+        $process = Get-Process -Id $item.ProcessId -ErrorAction SilentlyContinue
+        if ($process -and -not $process.WaitForExit(15000)) { throw 'Close OpenAI Dictation before updating so audio can be restored.' }
+    }
+}
 if ($ReplaceHandy) {
     $handy = Join-Path $env:LOCALAPPDATA 'Handy'
     $helper = Join-Path $handy 'shortcut-helper\AutoHotkey64.exe'
