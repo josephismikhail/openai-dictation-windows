@@ -72,7 +72,7 @@ public sealed class PixelVoiceAnimationTests
         var animation=new PixelVoiceAnimation();animation.BeginProcessing(1000);
         var first=animation.Frame(1000,1920,1080,false);var later=animation.Frame(8000,1920,1080,false);
         Assert.Empty(first.Bars);Assert.Equal(first.InnerShape,later.InnerShape);
-        Assert.Equal(62.5,first.InnerShape!.Value.Radius);Assert.Equal(3.5,first.InnerShape.Value.Exponent);
+        Assert.Equal(150,first.InnerShape!.Value.Radius);Assert.Equal(3.5,first.InnerShape.Value.Exponent);
         Assert.Equal(0,first.InnerShape.Value.Rotation);Assert.Equal(220,first.InnerShape.Value.Alpha);
     }
     [Fact] public void NarrowDisplaysStillContainTheWaveAndShape()
@@ -81,6 +81,21 @@ public sealed class PixelVoiceAnimationTests
         var wave=animation.Frame(1016,280,400,true);Assert.Equal(200,wave.Width);
         animation.BeginProcessing(1100);
         Assert.True(animation.Frame(1600,280,400,true).OuterShape!.Value.Radius<140);
+    }
+    [Theory]
+    [InlineData(1920,1080)]
+    [InlineData(280,400)]
+    [InlineData(400,280)]
+    public void LargerProcessingShapeBreathesWithinScreenBounds(double width,double height)
+    {
+        var animation=new PixelVoiceAnimation();animation.BeginProcessing(1000);
+        for(int i=0;i<240;i++)
+        {
+            var frame=animation.Frame(1450+i*16,width,height,true);
+            Assert.InRange(frame.InnerShape!.Value.Radius,Math.Min(144,Math.Min(width,height)*.23),Math.Min(156,Math.Min(width,height)*.23));
+            // Rotation can expand the bounding box; include the outer halo as well.
+            Assert.True(frame.OuterShape!.Value.Radius*Math.Sqrt(2)<Math.Min(width,height)/2);
+        }
     }
     [Theory]
     [InlineData(1920,1080,595)]

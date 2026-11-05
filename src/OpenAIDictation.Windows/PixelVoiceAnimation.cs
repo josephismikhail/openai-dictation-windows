@@ -36,7 +36,7 @@ internal sealed class PixelVoiceAnimation
             transition=transition*transition*(3-2*transition);
             double seconds=animate?Math.Max(0,milliseconds-processingStarted)/1000:0;
             double breath=.5+.5*Math.Sin(seconds*3.2);
-            double radius=Math.Min(60+5*breath,Math.Min(viewWidth,viewHeight)*.23)*(.65+.35*transition);
+            double radius=Math.Min(144+12*breath,Math.Min(viewWidth,viewHeight)*.23)*(.65+.35*transition);
             lastFrame=milliseconds;
             return new(width,1.2+2*displayed,(int)((190+65*displayed)*(1-transition)),false,
                 transition<1?Bars(width*(1-.8*transition),viewHeight,1-transition):[],
