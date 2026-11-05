@@ -30,6 +30,7 @@ public partial class App:System.Windows.Application
         internal readonly MemoryStream Recorded=new();
         internal PcmRecorder? Recorder;
         internal SystemAudioMute? AudioMute;
+        internal RecordingStartCue? StartCue;
         internal readonly object CaptureGate=new();
         internal Task Connection=Task.CompletedTask,Sender=Task.CompletedTask;
         internal bool Processing;
@@ -120,7 +121,9 @@ public partial class App:System.Windows.Application
                     Dispatcher.BeginInvoke(()=>{if(current==session && !session.Processing)_=StopAsync();});
             };
             session.Recorder.Level+=level=>Dispatcher.BeginInvoke(()=>{if(current==session)overlay?.SetLevel(level);});
-            session.Recorder.Start();overlay!.Present(OverlayState.Recording,session.Target);_=ObserveConnection(session);_=LimitRecording(session);
+            session.Recorder.Start();overlay!.Present(OverlayState.Recording,session.Target);
+            session.StartCue=new RecordingStartCue(session.AudioMute,session.Cancel.Token);
+            _=ObserveConnection(session);_=LimitRecording(session);
         }
         catch(Exception ex){if(started!=null)Fail(started,SafeMessage(ex));else{ShowError(SafeMessage(ex));ShowSettings();}}
     }
@@ -181,7 +184,12 @@ public partial class App:System.Windows.Application
             finally
             {
                 session.Recorder=null;
-                session.AudioMute?.Dispose();session.AudioMute=null;
+                try{session.StartCue?.Dispose();}
+                finally
+                {
+                    session.StartCue=null;
+                    session.AudioMute?.Dispose();session.AudioMute=null;
+                }
             }
         }
     }

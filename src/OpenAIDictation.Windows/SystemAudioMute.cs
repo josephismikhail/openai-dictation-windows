@@ -9,6 +9,7 @@ internal sealed class SystemAudioMute : IDisposable
     private readonly IAudioOutputSource source;
     private readonly Dictionary<string,IAudioOutput> changed=new(StringComparer.Ordinal);
     private Timer? monitor;
+    private string? cueOutput;
     private bool disposed;
     internal event Action? Failed;
 
@@ -47,7 +48,7 @@ internal sealed class SystemAudioMute : IDisposable
                         {
                             // Use the latest handle after a device reconnects, while
                             // preserving ownership of our original unmuted state.
-                            if(!output.IsMuted)output.SetMuted(true);
+                            if(output.Id!=cueOutput && !output.IsMuted)output.SetMuted(true);
                             if(!ReferenceEquals(changed[output.Id],output))changed[output.Id].Dispose();
                             changed[output.Id]=output;retain=true;
                         }
@@ -62,6 +63,33 @@ internal sealed class SystemAudioMute : IDisposable
             finally{for(int i=next+1;i<outputs.Count;i++)outputs[i].Dispose();}
         }
     }
+    /// <summary>Permit only an output this lease muted, after the caller has silenced its other sessions.</summary>
+    internal IDisposable? PermitCue(string id)
+    {
+        lock(gate)
+        {
+            if(disposed || cueOutput!=null || !changed.TryGetValue(id,out var output) || !output.IsMuted)return null;
+            cueOutput=id;
+            try{output.SetMuted(false);return new CuePermit(this,id);}
+            catch{try{EndCue(id);}catch{}throw;}
+        }
+    }
+    private void EndCue(string id)
+    {
+        lock(gate)
+        {
+            if(cueOutput!=id)return;
+            // Re-mute before the caller restores any other application's session.
+            if(!disposed && changed.TryGetValue(id,out var output))output.SetMuted(true);
+            cueOutput=null;
+        }
+    }
+    internal void CloseCue(){lock(gate){if(cueOutput!=null)EndCue(cueOutput);}}
+    private sealed class CuePermit(SystemAudioMute owner,string id):IDisposable
+    {
+        public void Dispose()=>owner.EndCue(id);
+    }
+    internal void ReportCueFailure(){try{Failed?.Invoke();}catch{}}
     public void Dispose()
     {
         lock(gate)
