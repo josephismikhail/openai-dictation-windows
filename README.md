@@ -1,7 +1,5 @@
 # Windows OpenAI Dictation
 
-**Local experiment: `experiment/pixel-fullscreen-dictation`.** This branch tries the Pixel-style full-screen interface. It has not been pushed or merged into the GitHub project.
-
 A small native Windows app for **Win+H dictation with OpenAI transcription and cleanup**. It dims the active monitor with the Pixel-style voice animation while you speak, then pastes the cleaned text into the app you started from.
 
 This is an independent project, inspired by Handy's minimal recording interface. It is not affiliated with Handy, Microsoft, or OpenAI.
@@ -46,17 +44,19 @@ Open **Settings** from the tray menu, enter your own API key, and save it. Keys 
 
 ## Interface
 
-The active monitor is covered by an 80% black translucent layer, leaving its contents visible without blur. Other monitors are unchanged. The centered white waveform uses the Pixel's 49 bars, microphone-level mapping, history, and smoothing. When recording stops, it contracts over 450 ms into the Pixel's gently breathing rounded processing shape. The view stays until insertion finishes or the session is canceled.
+The active monitor is covered by an 80% black translucent layer, leaving its contents visible without blur. Other monitors are unchanged. The overlay finishes its initial layout before appearing to avoid a partial-screen flash. The centered white waveform uses the Pixel's 49 bars, microphone-level mapping, history, and smoothing, enlarged for a desktop display. When recording stops, it contracts over 450 ms into a large, gently breathing rounded processing shape. The view dismisses immediately before the app checks the destination and inserts the text.
 
 The overlay does not activate or take keyboard focus from the original editor. The existing insertion-target checks still apply. Escape cancels; the same Win+H shortcut starts and stops recording. Reduced system animations use a static processing shape. There are no routine status labels, start sounds, or visible cancel controls.
 
 Errors show a complete safe explanation. Escape or a click dismisses the error view; it also closes automatically after 20 seconds unless replaced by a new recording.
 
+Stopping a recording with no recognized speech dismisses silently, without inserting text or showing a notification.
+
 ## Audio while recording
 
 Starting dictation temporarily mutes every active Windows audio output, including playback from browsers, Spotify, and other apps. It preserves devices that were already muted and does not change volume levels. Audio returns after microphone capture stops, before transcription and cleanup finish. Canceling or normally exiting also restores the previous state. Newly active outputs are checked while recording.
 
-This experiment does not create a start-sound renderer or play any recording cue.
+There is no recording cue sound; the full-screen view indicates that the microphone is listening.
 
 This changes Windows' output mute state. If the process is forcibly terminated or crashes while recording, Windows may remain muted; unmute it using the system volume control.
 
