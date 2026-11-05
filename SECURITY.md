@@ -10,6 +10,8 @@ The settings field must remain masked and must not refill with the saved key. Bl
 
 The microphone is opened only for an explicit recording and is closed on stop, cancel, error, or shutdown. A bounded recording length protects against forgotten sessions. Audio is kept in memory for streaming and fallback, then released. Public tests do not open a real microphone or use an API key.
 
+Recording temporarily mutes active output devices through Windows Core Audio. The app remembers which devices it muted and restores them after capture ends, including cancellation and normal shutdown. It never changes the microphone volume or output volume levels. Forced termination cannot run cleanup, so manual unmuting may be needed after a crash.
+
 Production requests go directly to `api.openai.com` over TLS. No project server, telemetry collector, analytics SDK, or automatic update service is present. Response bodies and transcripts must not appear in error logs. Error messages should describe the failure without including credentials or private dictation.
 
 OpenAI receives the audio and cleanup inputs. Its account terms and retention policies apply. `store: false` is a request option, not a claim of zero retention.
