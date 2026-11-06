@@ -52,7 +52,7 @@ public partial class App:System.Windows.Application
             Shutdown();return;
         }
         if(e.Args.Contains("--quit")){Shutdown();return;}
-        overlay=new OverlayWindow();overlay.StopRequested+=()=>_ = StopAsync();overlay.CancelRequested+=Cancel;
+        overlay=OverlayWindow.CreateFresh(null,()=>_ = StopAsync(),Cancel);
         tray=new System.Windows.Forms.NotifyIcon{Icon=System.Drawing.SystemIcons.Application,Text="OpenAI Dictation — Win+H",Visible=true};
         var menu=new System.Windows.Forms.ContextMenuStrip();menu.Items.Add("Settings",null,(_,_)=>Dispatcher.Invoke(ShowSettings));menu.Items.Add("Start / stop  Win+H",null,(_,_)=>Dispatcher.Invoke(Toggle));menu.Items.Add("Recover last text",null,(_,_)=>Dispatcher.Invoke(RecoverText));menu.Items.Add("Quit",null,(_,_)=>Dispatcher.Invoke(()=>Shutdown()));tray.ContextMenuStrip=menu;tray.DoubleClick+=(_,_)=>Dispatcher.Invoke(ShowSettings);
         try{shortcut=new GlobalShortcut{Active=()=>current!=null || overlay?.IsVisible==true};shortcut.Toggle+=()=>Dispatcher.BeginInvoke(Toggle);shortcut.Cancel+=()=>Dispatcher.BeginInvoke(Cancel);}catch{ShowError("Win+H could not be registered. Restart the app and try again.");}
@@ -92,7 +92,7 @@ public partial class App:System.Windows.Application
         {
             string key=LocalStore.LoadKey();var options=LocalStore.LoadOptions();
             var focus=FocusSnapshot.Capture();
-            overlay?.Hide();
+            overlay=OverlayWindow.CreateFresh(overlay,()=>_ = StopAsync(),Cancel);
             started=new Session{Target=focus.Window,Focus=focus,Key=key,Options=options,Live=client.CreateSession(key,options)};current=started;
             var session=started;
             session.AudioMute=SystemAudioMute.Acquire();
@@ -221,7 +221,9 @@ public partial class App:System.Windows.Application
     {
         try{
             if(current!=null)return;int generation=++previewGeneration;errorGeneration++;
-            nint target=NativeMethods.GetForegroundWindow();overlay!.Present(OverlayState.Recording,target);
+            nint target=NativeMethods.GetForegroundWindow();
+            overlay=OverlayWindow.CreateFresh(overlay,()=>_ = StopAsync(),Cancel);
+            overlay.Present(OverlayState.Recording,target);
             for(int i=0;i<450 && current==null && generation==previewGeneration;i++){overlay.SetLevel((float)(.2+.75*Math.Abs(Math.Sin(i*.2))));await Task.Delay(33);}
             if(current!=null || generation!=previewGeneration)return;
             overlay.Present(OverlayState.Processing,target);await Task.Delay(5000);
