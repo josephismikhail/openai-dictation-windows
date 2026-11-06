@@ -39,6 +39,19 @@ public sealed class PixelVoiceAnimationTests
                 // Resetting signal data alone must not leave the old shape cached.
                 Assert.DoesNotContain(System.Windows.Media.VisualTreeHelper.GetDrawing(indicator).Children,
                     drawing=>drawing is System.Windows.Media.GeometryDrawing {Geometry:System.Windows.Media.StreamGeometry});
+                bool closed=false;overlay.Closed+=(_,_)=>closed=true;
+                var previous=overlay;
+                var previousHandle=new System.Windows.Interop.WindowInteropHelper(previous).Handle;
+                overlay=OverlayWindow.CreateFresh(previous,()=>{},()=>{});
+                Assert.True(closed);Assert.False(previous.IsVisible);
+                overlay.Present(OverlayState.Recording,target);
+                Assert.NotEqual(previousHandle,new System.Windows.Interop.WindowInteropHelper(overlay).Handle);
+                System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(
+                    System.Windows.Threading.DispatcherPriority.ApplicationIdle,new Action(()=>{}));
+                Assert.False(previous.IsVisible);Assert.Equal(0,previous.Opacity);
+                Assert.Equal(1,overlay.Opacity);
+                Assert.DoesNotContain(System.Windows.Media.VisualTreeHelper.GetDrawing((OverlayWindow.Indicator)overlay.Content).Children,
+                    drawing=>drawing is System.Windows.Media.GeometryDrawing {Geometry:System.Windows.Media.StreamGeometry});
             }
             catch(Exception caught){error=caught;}
             finally{overlay?.Close();}
@@ -73,20 +86,43 @@ public sealed class PixelVoiceAnimationTests
     }
     [Fact] public void SilenceIsAFlatCenteredLineWithNoSyntheticSpeech()
     {
-        var animation=new PixelVoiceAnimation();animation.Observe(.17f,1000);
+        var animation=new PixelVoiceAnimation();animation.Observe(.03f,1000);
         var frame=animation.Frame(1016,1920,1080,true);
         Assert.True(frame.FlatLine);Assert.Empty(frame.Bars);Assert.Equal(900,frame.Width);
         Assert.Equal(1,frame.StrokeWidth);Assert.Equal(128,frame.WaveAlpha);
     }
-    [Fact] public void PhoneGainAndSmoothingProduce49StrongCenteredBars()
+    [Fact] public void DesktopGainAndSmoothingProduce49StrongCenteredBars()
     {
         var animation=new PixelVoiceAnimation();animation.Observe(.5f,1000);
         var frame=animation.Frame(1016,1920,1080,true);
         Assert.False(frame.FlatLine);Assert.Equal(49,frame.Bars.Length);
         Assert.Equal(-450,frame.Bars[0].X);Assert.Equal(0,frame.Bars[24].X);Assert.Equal(450,frame.Bars[^1].X);
-        Assert.InRange(frame.Bars[24].Height,190,205);
+        Assert.InRange(frame.Bars[24].Height,200,215);
         Assert.Equal(1,frame.Bars[0].Height,6);Assert.Equal(1,frame.Bars[^1].Height,6);
         Assert.InRange(frame.StrokeWidth,1.8,2);Assert.InRange(frame.WaveAlpha,210,220);
+    }
+    [Fact] public void QuietCapturedSpeechStillProducesVisibleFeedback()
+    {
+        // About -50 dBFS: valid quiet speech that the previous visual gate suppressed.
+        byte[] pcm=new byte[1920];
+        for(int i=0;i<pcm.Length;i+=2)System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(pcm.AsSpan(i,2),104);
+        var animation=new PixelVoiceAnimation();animation.Observe(PixelAudioLevel.Measure(pcm),1000);
+        var frame=animation.Frame(1016,1920,1080,true);
+        Assert.False(frame.FlatLine);Assert.True(frame.Bars[24].Height>60);
+    }
+    [Fact] public void SpeechPeakSurvivesSilentBuffersBatchedBeforeAFrameThenDecays()
+    {
+        var animation=new PixelVoiceAnimation();animation.Observe(.7f,1000);
+        animation.Observe(0,1001);animation.Observe(0,1002);
+        var frame=animation.Frame(1016,1920,1080,true);
+        Assert.False(frame.FlatLine);Assert.True(frame.Bars[24].Height>100);
+        for(int i=0;i<60;i++)
+        {
+            animation.Observe(0,1032+i*16);frame=animation.Frame(1032+i*16,1920,1080,true);
+        }
+        Assert.True(frame.FlatLine);
+        animation.Observe(1,3000);animation.Clear();
+        Assert.True(animation.Frame(3016,1920,1080,true).FlatLine);
     }
     [Fact] public void MissingSamplesDecayAfter220MillisecondsAndClearResetsHistory()
     {

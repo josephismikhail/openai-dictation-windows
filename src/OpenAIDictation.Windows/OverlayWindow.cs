@@ -17,6 +17,15 @@ internal sealed class OverlayWindow:Window
     private int presentationGeneration;
     public event Action? StopRequested;
     public event Action? CancelRequested;
+    internal static OverlayWindow CreateFresh(OverlayWindow? previous,Action stop,Action cancel)
+    {
+        // A hidden layered HWND can retain its last compositor surface even when
+        // the managed drawing is reset. A new recording gets a new native surface.
+        previous?.Close();
+        var window=new OverlayWindow();
+        window.StopRequested+=stop;window.CancelRequested+=cancel;
+        return window;
+    }
     public OverlayWindow()
     {
         Title="OpenAI Dictation";
@@ -45,6 +54,7 @@ internal sealed class OverlayWindow:Window
         timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(16)};
         timer.Tick+=(_,_)=>{if(SystemParameters.ClientAreaAnimation)indicator.InvalidateVisual();};
         IsVisibleChanged+=(_,_)=>{if(IsVisible)timer.Start();else{timer.Stop();presentationGeneration++;}};
+        Closed+=(_,_)=>{timer.Stop();presentationGeneration++;};
     }
     public void Present(OverlayState state,nint target,string? message=null)
     {

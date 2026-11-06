@@ -9,16 +9,19 @@ internal sealed class PixelVoiceAnimation
 {
     internal const int BarCount=49;
     private readonly double[] levels=new double[BarCount];
-    private double displayed,target,lastFrame,lastSample,processingStarted;
+    private double displayed,target,pendingPeak,lastFrame,lastSample,processingStarted;
     private bool processing;
     internal void Clear()
     {
-        Array.Clear(levels);displayed=target=lastFrame=lastSample=processingStarted=0;processing=false;
+        Array.Clear(levels);displayed=target=pendingPeak=lastFrame=lastSample=processingStarted=0;processing=false;
     }
     internal void Observe(float value,double milliseconds)
     {
         if(!float.IsFinite(value))value=0;
-        target=Math.Pow(Math.Clamp((value-.18)/.45,0,1),.4);
+        target=Math.Pow(Math.Clamp((value-.04)/.59,0,1),.4);
+        // Several capture callbacks can arrive before WPF renders. Preserve the
+        // strongest sample so a later silent buffer cannot erase that speech.
+        pendingPeak=Math.Max(pendingPeak,target);
         lastSample=milliseconds;
         Array.Copy(levels,1,levels,0,levels.Length-1);levels[^1]=target;
     }
@@ -44,7 +47,8 @@ internal sealed class PixelVoiceAnimation
                 new(radius,3.5+Math.Sin(seconds*1.4)*.6,Math.Sin(seconds*.9)*.1,(int)(220*transition)));
         }
         double dt=lastFrame==0?.016:Math.Clamp((milliseconds-lastFrame)/1000,0,.1);
-        double desired=milliseconds-lastSample>220?0:target;
+        double desired=milliseconds-lastSample>220?0:Math.Max(target,pendingPeak);
+        pendingPeak=0;
         displayed+=(desired-displayed)*(1-Math.Exp(-dt*(desired>displayed?32:14)));
         lastFrame=milliseconds;
         bool flat=displayed<.02;
